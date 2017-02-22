@@ -1,0 +1,102 @@
+ssh：Secure SHell, TCP/22
+openssh(开源)
+
+客户端软件：
+linux：ssh
+Windows：putty, SecureCRT(商业版), SSHSecureShellClient, Xmanager
+
+服务器端：
+sshd
+
+openssh:ssh, sshd
+
+netstat -tnlp  #t是tcp协议,n以数字方式显示,l显示链接监听状态,p那个程序
+
+ssh(/etc/ssh/ssh_config)客户端工具
+sshd(/etc/ssh/sshd_config)服务端工具
+
+sshd配置文件/etc/ssh/sshd_config
+Protocol 2  #ssh版本号
+Port 22   #端口号
+AddressFamily any   #在ipv4还是ipv6版本的地址上监听服务any是两个都支持，其他是IPV4 IPV6
+ListenAddress 0.0.0.0   #监听在那个地址上，默认是所有地址
+# HostKey for protocol version 1   #用于指定协议1所用到的密钥
+#HostKey /etc/ssh/ssh_host_key
+# HostKeys for protocol version 2   #用于指定协议2所用到的密钥
+#HostKey /etc/ssh/ssh_host_rsa_key
+#HostKey /etc/ssh/ssh_host_dsa_key
+KeyRegenerationInterval 1h   #密钥重新生成的时间间隔
+ServerKeyBits 1024  #服务器端密钥长度
+SyslogFacility AUTHPRIV   #使用那个Facility记录日志
+LogLevel INFO   #日志级别
+LoginGraceTime 2m   #最大的超时时间
+PermitRootLogin yes  #是否允许管理员直接登录
+MaxAuthTries 6   #最多一次允许登录几次
+RSAAuthentication yes   #是否支持RSA认证
+PubkeyAuthentication yes   #是否支持密钥认证
+AuthorizedKeysFile	.ssh/authorized_keys   #密钥放到那里
+RhostsRSAAuthentication no   #主机认证
+PasswordAuthentication yes   #口令认证
+ChallengeResponseAuthentication no   #不安全，是否启用基于挑战时握手认证协议
+UsePAM yes   #是否支持PAM认证
+X11Forwarding yes   #是否转发X11请求
+PrintMotd yes   #用户登录时是否显示Motd文件内容，motd在/etc/motd
+PrintLastLog yes  #是否显示最后一次登录信息
+Subsystem	sftp	/usr/libexec/openssh/sftp-server   #基于ssl的ftp程序 
+
+man ssd_config可以得到所有配置的帮助
+
+修改配置文件后需要重新启动sshd服务
+
+ssh：
+ssh -l USERNAME REMOTE_HOST ['command']
+ssh  USERNAME@REMOTE_HOST
+ -p 指定端口
+
+
+基于密钥的认证：
+1、生成一对密钥
+ssh-keygen
+ -t {rsa|dsa}
+ -f /path/to/keyfile 指定文件
+ -N 'password'  指定密码
+2、将公钥传输至服务器端某用户的家目录下的.ssh/authorized_keys文件中
+使用文件传输工具传输(ssh-copy-id, scp)
+ssh-copy-id -i /path/to/pubkey USERNAME@REMOTE_HOST
+3、测试登录
+
+ssh-keygen -t rsa
+或
+ssh-keygen -t rsa -f .ssh/id_rsa
+或
+ssh-keygen -t rsa -f .ssh/id_rsa -N ''
+ssh-copy-id -i .ssh/id_rsa.pub root@172.16.100.2
+
+
+scp：基于ssh的远程复制命令，可以实现在主机之间传输数据
+scp [options] SRC DEST
+
+REMOTE_MACHINE
+ USERNAME@HOSTNAME:/path/to/somefile
+ 例子：
+ scp root@172.16.100.2:/etc/fstab ./    #把以root用户登录到172.16.100.2主机上，把/etc/fstab文件复制到当前目录下
+ scp install.log root@172.16.100.2:/root   #把当前目录下install.log文件复制到172.16.100.2上的/root目录下以root用户登录
+
+sftp USERNAEM@HOST   #用sftp登录到主机上
+sftp root@172.16.100.2  #以root用户登录到172.16.100.2这个主机上
+
+
+总结：
+1、密码应该经常换且足够复杂
+2、使用非默认端口
+3、限制登录客户地址
+4、禁止管理员直接登录
+5、仅允许有限制用户登录
+6、使用基于密钥的认证
+7、禁止使用版本1
+
+嵌入式系统专用的ssh软件 dropbear
+
+
+xshell登录不需要密码：
+工具(tools)-->新建用户密钥生成导向(User Key Generation Wizard)-->导出传到服务器上去-->cat id_rsa_1024.pub >> .ssh/authorized_keys

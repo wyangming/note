@@ -1,0 +1,821 @@
+linux系统启动流程
+
+PC：OS(Linux)
+POST-->BIOS(Boot Sequence)-->MBR(bootloader, 446)-->Kernel-->initrd-->(ROOTFS)/sbin/init(/etc/inittab)
+
+内核提供：
+文件系统
+进程管理
+内存管理
+安全功能
+驱动程序
+
+内核设计风格：
+	单内核：Linux(LWP)
+		模块化：
+			核心：ko(kerner object)核心动态加载外围模块
+			内核：/lib/modules/"内核版本号命令的目录"，内核命名vmlinuz-内核版本号：/boot/vmlinuz-2.6.32-431.el6.x86_64
+	微内核：Windows, Solaris(线程)
+
+在用户空间启用的进程由init管理，跟硬件打交道会切换到内核
+
+/etc/inittab中定义默认启动级别
+启动服务不同：
+	运行级别：0-6共7个级别
+		0：halt关机
+		1：single user mode，直接以管理员身份切入，s,S,single都表示1级别
+		2：multi user mode, no NFS
+		3：multi user mode, text mode：平时使用的没有图形界面
+		4：reseved
+		5：multi user mode, graphic mode：平时使用有图形界面
+		6：reboot重启
+
+详解启动过程：
+	bootloader(MBR)
+		LILO：Linux Loader(引导不了8G以上的硬盘, 非常适合嵌入式)
+		GRUB：GRand Unified Bootloader
+			Stagel：MBR
+			Stage1.5：为了引导第二阶段
+			Stage2：/boot/grub/
+
+/boot/grub/grub.conf文件：
+
+default=0  #设定默认启动的title的编号，从0开始
+timeout=5  #等待用户选择的超时时长，单位是秒
+splashimage=(hd0,0)/grub/splash.xpm.gz  #grub的背景图片，画面大小640*480，用的是14位色，必须是xpm
+hiddenmenu  #隐藏菜单
+password centoscentos #给grub加密码centoscentos
+password --md5 $1$bKuM7$lb/zOkF7aPYtQDb1BOSNR. #以md5方式给grub添加密码
+title CentOS (2.6.32-431.el6.x86_64)  #引导内核标题，或操作系统名称，字符串，可自由修改
+	root (hd0,0)  #内核文件所在的设备：对grub而言，所有类型硬盘一律为hd，格式为(hd#, N)：hd#，#表示为第几个磁盘；最后的N表示对应磁盘的分区；
+	password --md5 $1$bKuM7$lb/zOkF7aPYtQDb1BOSNR. #以md5方式在启动内核的时候输入密码才可以启动
+	kernel /vmlinuz-2.6.32-431.el6.x86_64 ro root=/dev/mapper/vg_centos-lv_root rd_NO_LUKS rd_LVM_LV=vg_centos/lv_swap rd_NO_MD crashkernel=auto LANG=zh_CN.UTF-8 rd_LVM_LV=vg_centos/lv_root  KEYBOARDTYPE=pc KEYTABLE=us rd_NO_DM rhgb quiet  #指下内核文件路径，及传递给内核的参数
+	initrd /initramfs-2.6.32-431.el6.x86_64.img  #ramdisk文件路径
+
+kernel与initrd里的路径是直接在/boot目录下找的，boot是一个独立分区，给grub用的
+
+grub-md5-crypt：用于生成一个密码的md5值
+
+当启动linux在菜单选项时，选中一个菜单按e键进入。编辑kernel时，e进入，在后面添加1里内核按/etc/inittab里定义的第一个级别来启动
+
+内核设计风格：
+核心：动态加载 内核模块
+内核：/lib/modules/"内核版本号命名的目录"/
+
+vmlinuz-内核版本号
+/lib/modules/内核版本号
+
+RedHat5：ramdisk-->initrd
+RedHat6：ramfs-->initramfs
+
+	单内核：Linux(LWP：)
+		核心：ko(kernel object)
+	微内核：Windows, Solaris(线程)
+
+内核提供：
+文件系统
+进程管理
+内存管理
+网络管理
+安全功能
+驱动程序
+
+ldd：显示二进制文件所依赖的共享库关系
+	ldd /PATH/TO/BINARY_FILE
+	例子：ldd /bin/bash 查看/bin/bash依赖的库文件
+chroot：完成根切换
+	chroot /PATH/TO/TEMPROOT [COMMAND]
+	例子：
+		mkdir -p /test/virroot/{bin,lib64}
+		cp /lib64/libtinfo.so.5 /test/virroot/lib64/
+		cp /lib64/libdl.so.2 /test/virroot/lib64/
+		cp /lib64/libc.so.6 /test/virroot/lib64/
+		cp /lib64/ld-linux-x86-64.so.2 /test/virroot/lib64/
+		cp /bin/bash /test/virroot/bin/
+		chroot /test/viroot /bin/bash
+		完成根切换后可以使用cd命令，exit退出
+		内核完成根切换后会把/proc，/sys，/dev再搬到相应的根上
+
+当yum出错时编辑/etc/resolv.conf文件添加nameserver 8.8.8.8即可
+yum install gimp
+gimp：相当于photoshop
+启动界面的图片大小为600*480，把图像-->模式-->索引改为14。图片类型为xpm，然后用gzip -9 FILENAME强制压缩
+
+sync同步信息
+
+查看运行级别：
+runlevel
+	第一个代表前一个级别，没有切换过则为N
+	第二个代表当前级别
+who -r
+
+查看内核：
+	uname -r[-a]
+
+dd if=/dev/zero of=/dev/sda count=1 bs=400 ：破坏掉硬盘
+
+安装grub stage1：
+# grub：进入交互命令
+grub> root (hd0,0) ：指定要安装的硬盘与分区
+grub> setup (hd0) ：安装到那个硬盘上
+
+安装grub第二种方式：
+# grub-install --root-directory=/path/to/boot's_parent_dir /path/to/device
+grub-install --root-directory=/
+
+grub修复
+grub> find
+grub> root (hd#,N)#在这里可按Tab键看是那个磁盘
+grub> kernel /path/to/kernel_file ro root=/  #Tab也可以补全文件名，需要写的时个跟grub.conf配置文件里的值是一样的
+grub> initrd /path/to/initrd_file
+grub> boot
+例子：
+readhat上：
+grub> root (hd0,0)
+grub> kernel /vmlinuz-2.6.32-431.el6.x86_64
+grub> initrd /initramfs-2.6.32-431.el6.x86_64.img
+grub> boot
+
+Kernel初始化的过程
+	设备探测
+	驱动初始化(可能会从initrd(initramfs)文件中装载驱动模块)
+	以只读方式挂载根文件系统
+	装载第一个进程init(PID：1)
+
+
+/sbin/init：(/etc/inittab)
+	upstart：ubuntu, d-bus, event-driven
+	systemd：
+
+id:runlevels:action:process
+id：标识符
+runlevels：在哪个级别运行此行
+action：在什么情况下执行此行
+process：要运行的程序
+
+ACTION：
+initdefault：设定默认运行级别
+sysinit：系统初始化
+wait：等待级别切换至引级别时执行
+ctrlaltdel：当用户按下Ctrl+Alt+Del键时
+powerfail：停电
+powerokwait：在关机时间内又来电
+respawn：一旦程序终止，会重新启动
+
+si::sysinit:/etc/rc.d/rc.sysinit完成系统初始化(这个脚本是学习的好范例)
+
+/etc/rc.d/rc.sysinit完成的任务
+	激活udev和selinux
+	根据/etc/sysctl.conf文件，来设定内核参数
+	设定时钟
+	装载键盘映射
+	启用交换分区
+	设置主机名
+	根文件系统检测，并以读写方式重新挂载
+	激活RAID和LVM设备
+	启用磁盘配额
+	根据/etc/fstab，检查挂载其他文件系统
+	清理过期的锁和PID文件
+
+/etc/rc.d/rc.sysinit
+	关闭或启动的优先次序，数据越小优先被选定
+	先关闭以K开头的服务，后启动以S开关的服务
+
+/etc/rc.d/init.d, /etc/init.d(可以在系统启动的时候启动)
+	服务类脚本：
+		start
+		SysV：/etc/rc.d/init.d
+			start|stop|restart|status
+			reload|configtest
+红帽是追寻SysV风格
+/etc/rc.d/init.d下的文件都有以下两行：
+# chkconfig: 2345 55 25
+# description: SSH is a protocol for secure remote shell access. \
+#              This service starts up the OpenSSH server daemon.
+			
+chkconfig：对服务脚本自动创建连接
+服务类脚本以一下共同点：
+# chkconfig：runlevels SS KK
+	当chkconfig命令来为此脚本在rc#.d目录创建链接时，runlevels表示默认创建为s*开头的链接，-表示没有级别默认为S*开头的链接；除此之外的级别默认为K*开头的链接
+		S后面的启动优先级为SS所表示的数字；K后面关闭优先次序为KK所表示的数字
+	runlevels：运行级别，如果为345则表是在3、4、5级别下运行此脚本。一般先开启的后关闭，加起来等于99即可不是一定的。-表示没有级别默认为S*开头的链接
+	SS：起动次序
+	KK：关闭次序
+# description：用于说明此脚本的简单功能；长的话用\换行即续行
+
+chkconfig --list：查看所有独立守护服务的启动设定；独立守护进程
+	chkconfig --list SERVICE_NAME：查看某一个服务
+
+chkconfig --add SERVICE_NAME：添加服务到启动项脚本必须在/etc/rc.d/init.d目录下
+chkconfig --del SERVICE_NAME：移除服务
+chkconfig [--level RUNLEVELS] SERVICE_NAME {on|off}：可以在不修改文件的情况下指定相应级别的关与闭
+	如果省略级别指定，默认为2345级别；
+例子：
+建立一个myservice.sh的文件内容如下：
+#!/bin/bash
+#
+# chkconfig: 2345 77 22
+# description: Test Service
+#
+LOCKFILE=/var/lock/subsys/myservice
+status() {
+  if [ -e $LOCKFILE ]; then
+    echo "Running..."
+  else
+    echo "Stopped..."
+  fi
+}
+usage(){
+  echo "`basename $0` {start|stop|restart|status}"
+}
+case $1 in
+start)
+  echo "Starting.."
+  touch $LOCKFILE;;
+stop)
+  echo "Stoping.."
+  rm -f $LOCKFILE &> /dev/null;;
+restart)
+  echo "Restarting...";;
+status)
+  status;;
+*)
+  usage;;
+esac
+测试成功后，cp myservice.sh /etc/rc.d/init.d/myservice
+chkconfig --add myservice
+chkconfig --level 24 myservice off ：24级别设置为关闭
+chkconfig --del myservice
+
+
+/etc/rc.d/rc.local：系统最后启动的一个服务，准确说，应该执行的一个脚本。系统不方便做成服务的功能可以写在这里面
+
+/etc/inittab的任务：
+	设定默认运行级别
+	运行系统初始化脚本
+	运行指定运行级别对应的目录下的脚本
+	设定Ctrl+Alt+Del组合键的操作
+	定义UPS电源在电源故障或恢复时的操作
+	启动虚拟终端(2345级别)
+	启动图形终端(5级别)
+
+守护进程的类型：
+	独立守护进程
+		xinetd：超级守护进程，对瞬时守护进程管理；是瞬时守护进程的代理人
+	瞬时守护进程：不需要关联至运行级别
+yum install xinetd
+安装完xinetd后用chkconfig --list可看到瞬时守护进程如果想启动瞬时守护进程用：
+chkconfig 瞬时守护进程名 on 如：chkconfig rsync on
+
+核心：/boot/vmlinuz-version
+内核模块(ko)：/lib/modules/version/
+
+内核设计：
+	单内核
+		模块化设计
+	微内核
+装载模块：
+	insmod
+	modprobe
+
+www.kernel.org：
+
+用户空间访问、监控内核的方式：
+/proc, /sys这两个目录是跟内核打交道的机制，通过用户空间执行一些命令可以修改内核工具的特性。修改方法就是修改/proc与/sys下的某个文件来实现的
+
+伪文件系统
+	/proc：目录大多是只读的
+	/proc/sys：此目录中的文件很多是可读写的
+	/sys/：某些文件可写
+修改这些文件来修改硬件的工作
+
+设定内核参数值的方法：
+echo VALUE > /proc/sys/TO/SOMEFILE
+	如：echo 1 > /proc/sys/vm/drop_caches
+	    echo testbing > /proc/sys/kernel/hostname
+sysctl -w kernel.hostname=centos
+sysctl -w vm.drop_caches=1
+	kernel.hostname代表的是/proc/sys目录下的文件，把/换为.
+	sysctl代表修改的是/proc/sys目录下的文件
+以上两种可以立即生效，但无法永久有效
+
+永久有效，但不能立即生效：/etc/sysctl.conf文件来编辑
+修改文件完成之后，执行如下命令可以立即生效：
+sysctl -p：会通知内核重读/etc/sysctl.conf
+sysctl -a：显示所有的内核参数及其值
+
+内核模块管理：
+lsmod：查看系统装载的模块信息
+
+modprobe MOD_NAME：装载模块，不需要指定模块路径只要指定模块名
+modprobe -r MOD_NAME：卸载某模块
+
+modinfo MOD_NAME：查看模块的具体信息
+例子：
+modprobe floppy
+modprobe -r floppy
+modinfo dm_log
+
+insmod /PATH/TO/MODULE_FILE：装载模块，必须指定模块路径
+rmmod MOD_NAME：卸载模块
+
+depmod /PATH/TO/MODILES_DIR：生成依赖关系表
+
+内核中的功能除了核心功能之外，在编译时，大多功能都有三种选择：
+	不使用此功能
+	编译成内核模块
+	编译进内核
+
+挂载本地yum内容：
+进入/etc/yum.repos.d/下建立local.repo文件内容如下：
+[base]
+name=Server
+baseurl=file:///media/cdrom/
+enabled=1
+gpgcheck=0
+建立mkdir /media/cdrom
+把光盘挂载到mount /dev/cdrom /media/cdrom下
+要编译内核必须装Development Tools与Development Libraries
+	
+如何手动编译内核：
+make gconfig：Gnome桌面环境使用，需要安装图形开发库组：GNOME Software Development
+make kconfig：KDE桌面环境使用，需要安装图形开发库
+
+在命令窗口下可以在内核目录下使用以下命令进行编译：
+make menuconfig：
+	当出错时：yum install ncurses-devel
+make
+make modules_install
+make install
+
+二次编译清理,清理前，如果有需要，请备份配置文件.config
+make clean
+make mrproper
+
+screen命令：
+yum install screen：安装screen
+screen -ls：显示已经建立的屏幕
+screen：直接打开一个新屏幕
+	Ctrl+a, d：拆除屏幕
+screen -r ID：还原回某个屏幕
+
+
+
+grub-->kernel-->initrd-->ROOTFS(/sbin/init, /bin/bash)
+
+生成initrd文件
+mkinitrd initrd文件路径 内核版本号
+
+mkinitrd /boot/initrd-`uname -r`.img `uname -r`
+
+手动配置一个linux系统：
+添加一块硬盘，若为/dev/sdb
+为/dev/sbd添加两个分区/dev/sdb1,/dev/sdb2
+格式化为ext3文件系统
+mke2fs -j /dev/sdb1
+mke2fs -j /dev/sdb2
+创建两个文件夹做为根目录与/boot的挂载点
+mkdir /mnt/{boot,sysroot}
+挂载根目录与/boot
+mount /dev/sdb1 /mnt/boot/
+mount /dev/sdb2 /mnt/sysroot/
+安装grub
+grub-install --root-directory=/mnt /dev/sdb
+复制内核
+cp /boot/vmlinuz-2.6.32-431.el6.x86_64 /mnt/boot/vmlinuz
+修改initrd文件
+mkdir iso
+cd iso
+解压当前系统里的initrd文件
+zcat /boot/initrd-2.6.32-431.el6.x86_64.img | cpio -id
+修改init脚本
+vim init
+把mkrootdev -t ext3 -o defaults,ro /dev/vo10/root改为
+mkrootdev -t ext3 -o defaults,ro /dev/sda1
+然后把resume LABEL=SWAP-sda3注释掉
+生成initrd文件
+find . | cpio -H newc --quiet -o | gzip -9 > /mnt/boot/initrd.gz
+编辑grub.conf文件如下
+vim /mnt/boot/grub/grub.conf
+default=0
+timeout=5
+title bing linux
+	root (hd0,0)
+	kernel /vmlinuz
+	initrd /initrd.gz
+建立相应的目录
+cd /mnt/sysroot/
+mkdir proc sys dev etc/rc.d lib lib64 bin sbin boot home var/log usr/{bin,sbin} root tmp -pv
+cp /sbin/init /mnt/sysroot/sbin/
+cp /bin/bash /mnt/sysroot/bin/
+把init与bash相应的库文件复制过来
+ldd /sbin/init
+cp /lib64/libnih.so.1 /mnt/sysroot/lib64/
+cp /lib64/libnih-dbus.so.1 /mnt/sysroot/lib64/
+cp /lib64/libdbus-1.so.3 /mnt/sysroot/lib64/
+cp /lib64/libpthread.so.0 /mnt/sysroot/lib64/
+cp /lib64/librt.so.1 /mnt/sysroot/lib64/
+cp /lib64/libgcc_s.so.1 /mnt/sysroot/lib64/
+cp /lib64/libc.so.6 /mnt/sysroot/lib64/
+cp /lib64/ld-linux-x86-64.so.2 /mnt/sysroot/lib64/
+ldd /sbin/bash
+cp /lib64/libtinfo.so.5 /mnt/sysroot/lib64/
+cp /lib64/libdl.so.2 /mnt/sysroot/lib64/
+编辑etc/inittab文件
+cd /mnt/sysroot/
+vim etc/inittab
+内容如下
+id:3:initdefault:
+编辑vim etc/rc.d/rc.sysinit文件内容如下：
+#!/bin/bash
+echo -e "\tWelcome to \033[31mDubing\033[0m Linux."
+/bin/bash
+chmod +x etc/rc.d/rc.sysinit
+复制两个模块
+cp /lib/modules/2.6.32-431.el6.x86_64/kernel/drivers/net/mii.ko /mnt/sysroot/lib/modules/
+cp /lib/modules/2.6.32-431.el6.x86_64/kernel/drivers/net/pcnet32.ko /mnt/sysroot/lib/modules/
+编辑vim etc/rc.d/rc.sysinit文件内容如下：
+echo -e "\tWelcome to \033[31mDubing\033[0m Linux."
+insmod /lib/modules/mii.ko
+insmod /lib/modules/pcnet32.ko
+ifconfig eth0 172.16.100.13/16
+ifconfig lo 127.0.0.1/8
+/bin/bash
+然后用复制命令的依赖库的脚本把：init,bash,ls,vim,ls,ifconfig,insmod,mkdir,touch等复制到相应的文件里
+在移植命令的时候可以加touch,mkdir,rm,mv,cp,cat,mount,umount,vi,vim,chmod,chown,ping,ifconfig,insmod,modprobe,rmmod,route,halt,reboot,shutdown,hostname,sync,sleep,mingetty,basename,agetty,seq,stty
+在建立vi etc/rc.d/rc.sysdone脚本内容如下:
+#!/bin/bash
+sync
+sleep 2
+sync
+exec /sbin/halt -p
+给个执行权限chmod +x etc/rc.d/rc.sysdone
+在etc/inittab里追加如下：
+l0:0:wait:/etc/rc.d/rc.sysdone
+制作重启脚本
+在etc/inittab里追加如下：
+l6:6:wait:/etc/rc.d/rc.reboot
+vi etc/rc.d/rc.reboot
+内容如下：
+#!/bin/bash
+sync
+sleep 1
+sync
+exec /sbin/halt
+给个执行权限：
+chmod +x etc/rc.d/rc.reboot
+把重启与关机做到同一个脚本里
+vi /etc/rc.d/init.d/halt
+#!/bin/bash
+case $0 in
+ *reboot)
+  COMMAND='/sbin/reboot';;
+ *halt)
+  COMMAND='/sbn/halt -p';;
+ *)
+  echo "Only call this scrpit by *reboot OR *halt;"
+esac
+case $1 in
+ start)
+  ;;
+ stop)
+  ;;
+ *)
+ echo "Usage: `basename $0` {start|stop}"
+esac
+exec $COMMAND
+给个执行权限 chmod +x halt
+cd etc/rc.d
+mkdir rc0.d rc6.d
+cd rc0.d
+ln -sv ../init.d/halt S99halt
+cd ../rc6.d
+ls -sv ../init.d/halt S99reboot
+这个时候前面写的rc.reboot与rc.sysdone没用了
+cd ..
+rm -rf rc.reboot rc.sysdone
+创建rc脚本如下
+vi rc
+#!/bin/bash
+RUNLEVEL=$1
+for I in /etc/rc.d/rc$RUNLEVEL.d/K*; do
+ $I stop
+done
+for I in /etc/rc.d/rc$RUNLEVEL.d/S*; do
+ $I start
+done
+给个执行权限chmod +x rc
+cd ..
+编辑vim inittab把最后两行改为
+l0:0:wait:/etc/rc.d/rc 0
+l6:6:wait:/etc/rc.d/rc 6
+编辑vim inittab添加3级别起动的服务
+cd etc/rc.d
+mkdir rc3.d
+vim init.d/tserver内容如下
+#!/bin/bash
+# chkconfig: 35 66 33
+# description: test service script
+prog=`basename $0`
+lockfile=/var/lock/subsys/$prog
+start(){
+ echo "Starting..."
+ touch $lockfile
+}
+stop(){
+ echo "Stoping..."
+ rm -f $lockfile
+}
+status(){
+ if [ -f $lockfile ]; then
+  echo "Running..."
+ else
+  echo "Stopped..."
+ fi
+}
+usage(){
+ echo "Usage: $prog {start|stop|status|restart}"
+}
+case $1 in
+ start)
+  start;;
+ stop)
+  stop;;
+ restart)
+  stop
+  start
+ status)
+  status;;
+ *)
+  usage
+  exit 1
+  ;;
+esac
+chmod +x tserver
+cd rc3.d
+ln -sv ../init.d/tserver S66tserver
+cd rc0.d
+ln -sv ../init.d/tserver K33tserver
+cd ../rc6.d
+ln -sv ../init.d/tserver K33tserver
+让脚本启动终端
+vim inittab添加如下内容
+1:2345:respawn:/sbin/agetty -n -l /bin/bash 38400 tty1
+2:2345:respawn:/sbin/agetty -n -l /bin/bash 38400 tty2
+这个时候rc.d/rc.sysinit里的/bin/bash可以去掉
+新建一个虚拟机把硬盘弄上去测试一下，以上方法只适合redhat5不适合centos6.5
+如果启动的时候报/bin/sh错误就在/bin/bash同目录下为它创建一个链接
+cd /mnt/sysroot/bin
+ln -sv bash sh
+让根文件系统可以以读写方式重新挂载，在/etc/fstab文件
+vim etc/fstab
+/dev/hda2 / ext3 defaults 0 0
+/dev/hda1 /boot ext3 defaults 0 0
+proc /proc proc defaults 0 0
+sysfs /sys sysfs default 0 0
+让开机的时候自动挂载为读写
+vim etc/rc.d/rc.sysinit
+添加内容如下：
+echo "Remount rootfs..."
+mount -n -o remount,rw /
+echo "Set the hostname..."
+[ - f /etc/sysconfig/network ] && . /etc/sysconfig/network
+[ -z $HOSTNAME -o "$HOSTNAME" == '(none)' ] && HOSTNAME=localhost
+/bin/hostname $	$HOSTNAME
+编辑主机名：
+mkdir etc/sysconfig
+vim /etc/sysconfig/network
+内容：
+HOSTNAME=minilinuxdubing
+启动服务显示
+新建脚本vim /etc/rc.d/init.d/functions内容如下：
+SCREEN=`STTY -F /dev/console size 2> /dev/null`
+COLUMNS=${SCREEN#* }
+[ -z $COLUMNS ] && COLUMNS=80
+SPA_COL=$[$COLUMNS-14]
+RED='\033[31m'
+GREEN='\033[32m'
+YELLOW='\033[33m'
+BLUE='\033[34m'
+NORMAL='\033[0m'
+success(){
+ string=$1
+ RT_SPA=$[$SPA_COL-${#string}]
+ echo -n "$string"
+ for I in `seq 1 $RT_SPA`; do
+  echo -n " "
+ done
+ echo -e "[   ${GREEN}OK${NORMAL}   ]"
+}
+failure(){
+ string=$1
+ RT_SPA=$[$SPA_COL-${#string}]
+ echo -n "$string"
+ for I in `seq 1 $RT_SPA`; do
+  echo -n " "
+ done
+ echo -e "[ ${RED}FAILED${NORMAL} ]"
+}
+修改tserver脚本内容如下：
+#!/bin/bash
+# chkconfig: 35 66 33
+# description: test service script
+. /etc/rc.d/init.d/functions
+prog=tserver
+lockfile=/var/lock/subsys/$prog
+start(){
+ touch $lockfile
+ [ $? -eq 0 ] && success "Starting $prog" || failure "Starting $prog"
+}
+stop(){
+ rm -f $lockfile
+ [ $? -eq 0 ] && success "Stoping $prog" || failure "Stoping $prog"
+}
+status(){
+ if [ -f $lockfile ]; then
+  echo "Running..."
+ else
+  echo "Stopped..."
+ fi
+}
+usage(){
+ echo "Usage: $prog {start|stop|status|restart}"
+}
+case $1 in
+ start)
+  start;;
+ stop)
+  stop;;
+ restart)
+  stop
+  start
+ status)
+  status;;
+ *)
+  usage
+  exit 1
+  ;;
+esac
+配置网卡：
+编辑vim etc/rc.d/rc.sysinit添加内容如下：
+echo "Initalizing newwork device..."
+/sbin/insmod /lib/modules/mii.ko
+/sbin/insmod /lib/modules/pcnet32.ko
+配置ip地址：
+vim etc/rc.d/init.d/network
+内容如下：
+mkdir etc/sysconfig/network-scripts
+vim etc/sysconfig/network-scripts/ifcfg-eth0
+内容
+DEVICE=eth0
+BOOTPROTO=static
+IPADDR=192.168.1.153
+NETMASK=255.255.255.0
+GATEWAY=192.168.1.1
+ONBOOT=yes
+自动启用编辑vim etc/rc.d/init.d/network内容
+#!/bin/bash
+# chkconfig: 35 09 90
+# description: network service
+prog=network
+. /etc/rc.d/init.d/functions
+CONF=/etc/sysconfig/network-scripts/ifcfg-eth0
+. $CONF
+NETMASK=24
+start(){
+ ifconfig eth0 $IPADDR/$NETMASK up
+ [ -z $GATEWAY ] && route add default gw $GATEWAY
+}
+stop(){
+ ifconfig eth0 down
+}
+status(){
+ ifconfig eth0
+}
+usage(){
+ echo "$prog: {start|stop|restart|status}"
+}
+case $1 in
+ start)
+  start
+  success "Config network eth0"
+  ;;
+ stop)
+  stop
+  success "Stop network card eth0"
+  ;;
+ restart)
+  stop
+  start
+  success "Restart network card eth0"
+ status)
+  status;;
+ *)
+  usage
+  exit 1
+esac
+保存退出后给chmod +x etc/rc.d/init.d/network
+cd etc/rc.d/rc0.d
+ln -sv ../init.d/network K90network
+cd ../rc6.d
+ln -sv ../init.d/network K90network
+cd ../rc3.d
+ln -sv ../init.d/network S09network
+
+ 
+
+在运行mingetty的时候会让用户先登录
+参数--loginprog=/bin/bash：会让/bin/bash直接登录
+除了mingetty还有agetty,stty,mgetty
+agetty -n -l /bin/bash 38400：可以不登录直接进入系统
+
+当两个系统共用一个磁盘的时候会出现文件系统错乱，修复方法如下：
+以上面为例：
+cd /mnt/sysroot
+find . | cpio -H newc --quiet -o | gzip > /root/sysroot.gz
+umount /dev/hda2
+如果卸载不掉用：fuser -km /dev/hda2强行卸载
+umount /dev/hda2
+mke2fs -j /dev/hda2
+mount /dev/hda2 /mnt/sysroot/
+cd /mnt/sysroot
+zcat /root/sysroot.gz | cpio -id
+检查一下文件
+
+/etc/mtab每挂载一个文件系统就会在些文件中添加一行
+/proc/mounts也会显示当前系统上所有文件系统
+mount -n参数可以不往/etc/mtab里添加内容
+mount -rwn /：以读写方式挂载
+
+halt只能关闭进程不可以切断电源,切换到0级别
+ exec halt -p
+
+Centos6.5系统裁剪：
+添加一块硬盘，若为/dev/sdb
+为/dev/sbd添加两个分区/dev/sdb1,/dev/sdb2
+格式化为ext3文件系统
+mke2fs -t ext4 /dev/sdb1
+mke2fs -t ext4 /dev/sdb2
+mkdir -pv /mylinux/{boot,sysroot}
+mount /dev/sdb1 /mylinux/boot
+mount /dev/sdb2 /mylinux/sysroot
+grub-install --root-directory=/mylinux /dev/sdb
+cp /boot/vmlinuz-2.6.32-431.el6.x86_64 /mylinux/boot/vmlinuz
+cp /boot/initramfs-2.6.32-431.el6.x86_64.img /mylinux/boot/initramfs.img
+编辑/mylinux/boot/grub/grub.conf下的文件内容如下：
+default=0
+timeout=2
+title dubinglinux
+	root (hd0,0)
+	kernel /vmlinuz ro root=/dev/sda2 quiet console=tty0 rdshell
+	initrd /initramfs.img
+然后用复制命令的依赖库的脚本把：vim,ls,ifconfig,insmod,mkdir,touch等复制到相应的文件里
+/mylinux/boot/grub/grub.conf里kernel后ro root指定根目录所在的分区quiet以静默方式挂载
+
+bash有些特性：
+${parameter#word}
+${parameter##word}
+	  Remove  matching  prefix pattern.  The word is expanded to produce a pat-
+	  tern just as in pathname expansion.  If the pattern matches the beginning
+	  of  the  value  of  parameter,  then  the  result of the expansion is the
+	  expanded value of parameter with the shortest matching pattern (the ‘‘#’’
+	  case)  or  the  longest  matching  pattern (the ‘‘##’’ case) deleted.  If
+	  parameter is @ or *, the pattern removal operation  is  applied  to  each
+	  positional  parameter  in  turn, and the expansion is the resultant list.
+	  If parameter is an array variable subscripted with @ or  *,  the  pattern
+	  removal operation is applied to each member of the array in turn, and the
+	  expansion is the resultant list.
+效果如下：
+FILE=/usr/local/src/linux/driver
+echo ${FILE#/}
+echo ${FILE##*/}
+FILE=usr/local/src/linux/driver
+echo ${FILE%%/*}
+echo ${FILE%/*}
+可测试一下效果
+
+脚本例子：
+复制命令的依赖库：
+#!/bin/bash
+DEST=/mnt/sysroot
+libcp(){
+ LIBPATH=${1%/*}
+ [ ! -d $DEST$LIBPATH ] && mkdir -p $DEST$LIBPATH
+ [ ! -e $DEST${1} ] && cp $1 $DEST$LIBPATH && echo "copy lib $1 finished."
+}
+bincp(){
+ CMDPATH=${1%/*}
+ [ ! -d $DEST$CMDPATH ] && mkdir -p $DEST$CMDPATH
+ [ ! -e $DEST${1} ] && cp $1 $DEST$CMDPATH
+ for LIB in `ldd $1 | grep -o "/.*lib\(64\)\{0,1\}/[^[:space:]]\{1,\}"`; do
+  libcp $LIB
+ done
+}
+read -p "Your command:" CMD
+until [ $CMD == 'q' ]; do
+ ! which $CMD && echo "Wrong command" && read -p "Input againe:" CMD && continue
+ COMMAND=`which $CMD | grep -v "^alias" | grep -o "[^[:space:]]\{1,\}"`
+ bincp $COMMAND
+ echo "copy $COMMAND finished."
+ read -p "Input againe:" CMD
+done

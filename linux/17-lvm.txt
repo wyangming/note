@@ -1,0 +1,308 @@
+lvm
+
+DM：Device Mapper提供逻辑设备,也可以实现将多个物理设备映射成为一个逻辑设备。DM比MD工能要强大的多。
+	linear：线性设备，可以将多个磁盘上的存储空间当做一个来使用
+	mirror：类似于镜像
+	snapshot：快照，主要作用用来做数据备份
+	multipath：多路径
+DM不仅可以提供RAID还可以用于LVM2
+通常用MD做RAID，用DM做LVM2
+
+在用lvm之前磁盘创建的时候必须是：8e Linux LVM
+
+pe(physical extend)：pv的盘区
+le(logical extend)：lv的盘区
+在创建pe的时候也可以创建有镜像的工能
+fdisk命令最多可以支持15个分区
+
+pv(physical volume)：物理卷
+	pvcreate：创建pv
+		例子：
+			pvcreate /dev/sdb{5,7}：把/dev/sdb5与/dev/sdb7创建为pv
+	pvremove：删除pv相当于删除里面的信息
+	pvscan：扫描当前系统上有多少个pv
+	pvdisplay：查看pv，比pvs更加详细
+		例子：
+			pvdisplay
+			pvdisplay /dev/sdb5：只显示/dev/sdb5这一个pv的详细信息
+	pvmove：把一个盘上的数据移到另一个盘上
+	pvs：查看pv
+		
+vg(volume group)：卷组
+	vgcreate：创建一个vg
+		参数：
+			-s #：指定pe大小默认是4MB
+		例子：
+			vgcreate myvg /dev/sdb{5,7}：用/dev/sdb5与/dev/sdb7创建一个myvg
+			vgcreate -s 8M myvg /dev/sdb{5,7} 创建myvg指定pe大小为8M
+	vgremove：删除一个vg，只有vg没有和的时候才可以删除
+		例子：
+			vgremove myvg
+	vgextend：扩展一个vg
+		例子：
+			pvcreate /dev/sdb6
+			vgextend myvg /dev/sdb6
+				把/dev/sdb6作成vp加到卷组myvg里
+	vgreduce：缩减一个vg，其过程相当于拿掉一个pv，应该用pvmove先把数据移到其他的盘上去
+		例子：
+			pvmove /dev/sdb5
+			vgreduce myvg /dev/sdb5
+			pvremove /dev/sdb5
+				先把/dev/sdb5下的数据移到其他盘里，再把/dev/sdb5从myvg里缩减出去，然后从pv层拿掉/dev/sdb5
+	vgs：查看vg
+		例子：
+			vgs
+	vgdisplay：查看vg，比vgs更加详细
+		例子：
+			vgdisplay
+			vgdisplay myvg：只查看myvg的信息
+	vgscan：扫描当前系统上有多少个vg
+只要把pv加入到pv他的pe大小取块于vg的大小
+
+lv(logical volume)：逻辑卷
+	lvcreate：
+		lvcreate -n LV_NAME -L #G VG_NAME
+			-n：逻辑卷的名字
+			-L：逻辑卷的大小
+			VG_NAME：卷组名称
+		例子：
+			lvcreate -n testlv -L 50M myvg  ：在myvg卷组上创建testlv的逻辑卷
+			mke2fs -j /dev/myvg/testlv
+			mount /dev/myvg/testlv /mnt
+				格式化并挂载/dev/myvg/testlv
+				挂载后真正引用到的是/dev/mapper/myvg-testlv，而/dev/myvg/testlv是一个链接文件
+	lvremove：移除一个逻辑卷，当逻辑卷挡挡挂载时必须先卸载
+		例子：
+			umount /mnt
+			lvremove /dev/myvg/testlv
+				先卸载/dev/myvg/testlv然后移除它
+	lvextend：扩展逻辑卷的物理边界
+		lvextend -L [+]# /path/to/lv：不带+是扩展到多大空间，带+是扩展了多大空间
+	resize2fs：扩展逻辑卷文件系统边界
+		resize2fs /path/to/lv #：文件系统扩展到多少G；也可以进行缩减
+			注意：
+				不能在线缩减，得先卸载
+				确保缩减后的空间大小依然能够存储原有的数据
+				在缩减之前应该强行检查文件，以确保文件系统处于一至性状态
+		resize2fs -p /path/to/lv：文件系统扩展到物理边界
+		例子：
+			lvcreate -L 2G -n testlv myvg
+			mke2fs -j /dev/myvg/testlv
+			mkdir /users
+			mount /dev/myvg/testlv /users
+			lvextend -L 5G /dev/myvg/testlv
+			resize2fs -p /dev/myvg/testlv
+				创建一个2G的逻辑卷再把扩展到5G
+	lvreduce：
+		lvreduce -L [-]# /path/to/lv：类似于lvextend的+号
+			例子：
+				df -lh ：查检缩减后的空间是否可以存得下数据
+				umount /users ：卸载逻辑卷
+				e2fsck -f /dev/myvg/testlv ：强行文件查测
+				resize2fs /dev/myvg/testlv 3G ：缩减至3G
+				lvreduce /dev/myvg/testlv 3G ：物理卷缩减至3G
+				mount /dev/myvg/testlv /users ：再次挂载起来
+	lvs：查看逻辑卷
+	lvdisplay：显示所有的lv,如果想显示某一个：lvdisplay /dev/myvg/testlv
+
+
+创建快照：
+特点：
+	生命周期为整个数据时长：在这段时间内，数据的增长量不能超出快照卷的大小。否则自动损毁
+	快照卷是只读的
+	跟原卷在同一卷组内
+
+lvcreate
+	参数：
+		-s：指定创建的是快照卷
+		-p r|w：指定权限
+		
+	lvcreate -L # -n SLV_NAME -P r /path/to/lv
+	-L大小
+	-n快照卷名称
+	-P权限
+	/path/to/lv逻辑卷
+	
+	例子：
+		lvcreate -L 50M -n testlv-snap -s -p r /dev/myvg/testlv
+		mount /dev/myvg/testlv-snap /mnt
+			创建快照并挂载到/mnt目录下
+		
+		umount /mnt
+		lvremove /dev/myvg/testlv-snap
+			移除快照卷
+
+快照属于增量备份
+
+until循环：
+
+while CONDITION; do
+	statment
+	...
+done
+
+进入循环：条件满足
+退出循环：条件不满足
+
+for 变量 in 列表; do
+	循环体
+done
+
+for (( expr1 ; expr2 ; expr3 )); do
+	循环体
+done
+
+例子：
+declare -i SUM2=0
+
+for ((I=1;I<=100;I++)); do
+	let SUM2+=$I
+done
+
+echo $SUM2
+
+
+until CONDITION; do
+	statment
+	...
+done
+
+进入循环：条件不满足
+退出循环：条件满足
+
+read -p "Input something:"STRING
+until [ $STRING == 'quit' ]; do
+	echo $STRING | tr 'a-z' 'A-Z'
+	read -p "Input something:"STRING
+done
+
+
+who | grep "hadoop" &> /dev/null
+RETVAL=$?
+until [ $RETVAL -eq 0 ]; do
+	echo "hadoop is not come."
+	sleep 5
+	who | grep "hadoop" &> /dev/null
+	RETVAL=$?
+done
+echo "hadoop is logging in."
+或者
+until who | grep "hadoop" &> /dev/null; do
+	echo "hadoop is not come."
+done
+echo "hadoop is logging in."
+
+在想引用一个命令状态返回值的时候，可以把命令直接当做条件来用
+
+ping
+	参数：
+		-c #：指定ping几次
+		-W #：指定超时时间，单位是秒
+
+awk 'PATTERN{ACTION}' file
+	ACTION
+		print $1
+			$0：表示整行
+			$NF：最后一个字段
+	参数：
+		-F：指定输入分隔符
+	例子：
+		df -Ph | awk ' {print $1}'：把结果的第一列打印出来
+		df -Ph | awk ' {print $1,$3}'：显示第一行与第三行
+		df -Ph | awk ' {print $0}'：显示整行
+		df -Ph | awk ' {print $NF}'：显示最后一个字段
+		awk -F: '{print $1,$3} /etc/passwd：指定输入分隔符
+
+练习：
+找出系统上的磁盘信息
+	fdisk -l 2> /dev/null | grep "^Disk /dev/[sh]d[a-z]"
+		fdisk -l 2> /dev/null：把错误命令写到数据黑洞里
+只要设备本身的名字
+	fdisk -l 2> /dev/null | grep "^Disk /dev/[sh]d[a-z]" | awk -F: '{print $1}'
+
+dd if=/dev/zero of=/dev/sdb bs=512 count=1 ：删除/dev/sdb硬盘里的所有分区
+
+sync：手动把操作同步到硬盘中，执行这个操作好最好用sleep 3让进程停下来3秒，不然硬盘会因主速度太快而受不了
+
+练习：
+写一个脚本(前提：请为虚拟机新增一块硬盘，假设它为/dev/sdb),为指定硬盘创建分区：
+1、列出当前系统上所有的磁盘，让用户选择，如果选择quit则退出脚本；如果用户选择错误，就让用户重新选择；
+2、当用户选择后，提醒用户确认接下来的操作可能会损坏数据，并请用户确认：如果用户选择y就继续，否则，让用户重新选择；
+3、抹除那块硬盘上的所有分区(提示，抹除所有分区后执行sync命令，让脚本睡眠3秒钟后再分区)：并为其创建三个主分区，第一个为20M，第二个为512M, 第三个为128M，且第三个为swap分区类型：(提示：将分区命令通过echo传送给fdisk即可实现)
+
+脚本：
+echo "Initial a disk..."
+echo -e "\033[31mWarning:\033[0m "
+fdisk -l 2> /dev/null | grep "^Disk /dev/[sh]d[a-z]"
+
+read -p "Your choice: " PARTDISK
+
+if [ $PARTDISK == 'quit' ]; then
+  echo "quit"
+  exit 7
+fi
+
+until fdisk -l 2> /dev/null | grep -o "^Disk /dev/[sh]d[a-z]" | grep "^Disk $PARTDISK"; do
+  read -p "Wrong option, Your choice again: " PARTDISK
+done
+
+read -p "Will destory all data continue[y/n]:" CHOICE
+
+until [ $CHOICE == 'y' -o $CHOICE == 'n' ]; do
+  read -p "Will destory all data continue[y/n]:" CHOICE
+done
+
+if [ $CHOICE == 'n' ]; then
+  echo "Quit"
+  exit 9
+fi
+
+echo "Partition..."
+
+dd if=/dev/zero of=$PARTDISK bs=512 count=1 &> /dev/null
+sync
+sleep 3
+
+echo 'n
+p
+1
+
++20M
+n
+p
+2
+
++512M
+n
+p
+3
+
++128M
+t
+3
+82
+w' | fdisk $PARTDISK &> /dev/null
+
+partprobe $PARTDISK
+
+sync
+sleep 2
+
+mke2fs -j ${PARTDISK}1 &> /dev/null
+mke2fs -j ${PARTDISK}2 &> /dev/null
+mkswap ${PARTDISK}3 &> /dev/null
+
+自动卸载挂载的硬盘
+for I in `mount | grep "/dev/sdb" | awk '{print $1}'`; do
+	fuser -km $I
+	umount $I
+	echo "$I unmount ok."
+done
+
+
+
+
+
+
+
+

@@ -1,0 +1,410 @@
+keepalived + nginx：实现高可用
+ corosync + nginx
+
+Nginx会按需同时运行多个进程：一个主进程(master)和几个工作进程(worker)，配置了缓存时还会有缓存加载器进程(cache loader)和缓存管理器进程(cache manager)等。所有的进程均是仅含有一个线程，并主要通过"共享内存"的机制实现进程间通信。主进程以root用户身份运行，而worker, cache loader和cache manager均应以非特权用户身份支行。
+
+主进程主要完成如下工作：
+1、读取并验证配置信息；
+2、创建、绑定及关闭套接字；
+3、启动、终止及维护worker进程的个数；
+4、无须中止服务而重新配置工作特性；
+5、控制非中断式程序升级，启用新的二进制程序并在需要时回滚至老版本；
+6、重新打开日志文件，实现日志滚动；
+7、编译嵌入式perl脚本；
+
+worker进程主要完成的任务包括：
+1、接收、传入并处理来自客户端的连接；
+2、提供反向代理及过滤功能；
+3、nginx任何能完成的其他任务；
+
+cache loader进程主要完成的任务包括：
+1、检查缓存存储中的缓存对象；
+2、使用缓存元数据建立内存数据库；
+
+cache manager进程的主要任务：
+1、缓存的失效及过期检验；
+
+Nginx的配置有几个不同的上下文：main, http, server, upstream和location(还有实现邮件服务反向代理的mail)，配置语法的格式和定义方式遵循所谓的c风格，因此支持嵌套，还有着逻辑清晰并易于创建，阅读和维护等优势。
+
+Nginx的代码是由一个核心和一系列的模块组成，核心主要用于提供Web Server的基本功能，以及Web和Mail反向代理的功能；还用于启用网络协议，创建必要的支行时环境以及确保不同的模块之间平滑地进行交互。不过，大多跟协议相关的功能和某应用特有的功能都是由nginx模块实现的。这些功能模块大致可以分为事件模块、阶段性处理器、输出过滤器、变量处理器、协议、upstream和负载均衡几个类别，这些共同组成了nginx的http功能，事件模块主要用于提供OS独立的(不同操作系统的事件机制有所不同)事件通知机制如kqueue或epoll等。协议模块则负责实现nginx通过http, tls/ssl, smtp, pop3以及imap与对应的客户端建立会话。
+
+在nginx内部，进程间通信是通过模块的pipeline或chain实现的；换句话说，每一个功能或操作都由一个模块来实现，例如，压缩、通过FastCGI或uwsgi协议与upstream服务器通信，以及与memcached建立会话等。
+
+
+
+
+
+
+支持事件驱动的IO框架：kqueue, epol, /dev/poll
+
+安装nginx：
+wget ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.38.tar.gz
+tar -xvf pcre-8.38.tar.gz
+cd pcre-8.38
+./configure
+make
+make install
+wget http://ncu.dl.sourceforge.net/project/libpng/zlib/1.2.8/zlib-1.2.8.tar.gz
+tar -xvf zlib-1.2.8.tar.gz
+cd zlib-1.2.8
+./configure
+make
+make install
+yum install openssl-devel
+wget http://nginx.org/download/nginx-1.10.1.tar.gz
+tar -xvf nginx-1.10.1.tar.gz
+cd nginx-1.10.1
+./configure
+make
+make install
+ln -s /usr/local/lib/libpcre.so.1 /lib64/
+groupadd -r -g 108 nginx
+useradd -r -g 108 -u nginx
+
+
+nginx配置：
+ worker_processes  1;  #启动的worker线程数，cpu密集型(在本地需要占用更多的cpu运行时间)如SSL或压缩与cpu个数一样。如果是图片与下载站等需要大量内容给客户端，则worker数是cpu个数的1.5或2倍
+ events {
+	worker_connections 1024;   #每个worker所支持的连接数，一般是worker_process * worker_connections
+ }
+ http {
+	include mine.types;  #指定包含的文件
+	sendfile on;   #打开sendfile功能
+	keepalive_timeout  65;  #超时时间
+	gzip  on;   #压缩发送
+	server{  #每一个server定一个虚拟主机
+		listen 80; #端口
+		server_name localhost; #域名或主机名
+		access_log  logs/host.access.log  main;  #访问日志及使用的格式
+		location / {   #“/”即是一个目录也是一个uri
+            root   html;  #/定义url在那个目录上的
+            index  index.html index.htm;
+        }
+		error_page   500 502 503 504  /50x.html;  #错误类型的错误url,500 502 503 504的错误返回根下的50x.html
+        location = /50x.html {  #如果访问的本身就是50x.html就直接去html路径下访问
+            root   html;
+        }
+		#location ~ \.php$ {   #访问的文件中所有以.php结尾的文件
+        #    proxy_pass   http://127.0.0.1;
+        #}
+		#location ~ \.php$ {
+        #    root           html;
+        #    fastcgi_pass   127.0.0.1:9000;
+        #    fastcgi_index  index.php;
+        #    fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
+        #    include        fastcgi_params; #包含fastcgi_params里的信息
+        #}
+	}
+ }
+
+
+server里的location说明：
+location [ = | ~ | ~* | ^~ ] uri {...}
+=优先级最高，^~优先级第二，~与~*是第二优先级，最后一个是什么都没有的
+
+location URI {}：对当前路径及子路径下的资源都生效
+location = URI {}：只对当前路径生效，如果是目录只对目录生效，如果是文件只对文件生效
+location ~ URI {}：
+location ~* URI {}：模式匹配，此处的URL可以使用正则表达式。"~"区分大小写，"~*"不区分大小写
+location ~^ URI {}：明确说明不使用正则表达式
+location @name {}
+
+
+location里的配置说明：
+deny：拒绝访问
+allow：允许访问
+ 默认是所有都允许，想要拒绝所有访问deny all;
+ 192.168.1.1
+ 192.168.1.0/24
+ 以上方式是基于ip控制的写法格式
+ 
+ auth_basic "Restricted";  #表示这个localion是限制访问区
+ auth_basic_user_file /etc/nginx/.users; #用户认证的信息，nginx没有基于用户的控制机制，得借于httpd来实现，跟httpd生成的文件是一样的
+
+
+nginx命令使用
+ -s reload：重新载入
+ -t：进行语法测试
+
+
+nginx与php只可以以fastcgi方式结合
+
+结合时在include fastcgi_params;这个fastcgi_params文件内容如下
+fastcgi_param  GATEWAY_INTERFACE  CGI/1.1;
+fastcgi_param  SERVER_SOFTWARE    nginx/$nginx_version;
+fastcgi_param  QUERY_STRING       $query_string;
+fastcgi_param  REQUEST_METHOD     $request_method;
+fastcgi_param  CONTENT_TYPE       $content_type;
+fastcgi_param  CONTENT_LENGTH     $content_length;
+fastcgi_param  SCRIPT_FILENAME    $document_root$fastcgi_script_name;
+fastcgi_param  SCRIPT_NAME        $fastcgi_script_name;
+fastcgi_param  REQUEST_URI        $request_uri;
+fastcgi_param  DOCUMENT_URI       $document_uri;
+fastcgi_param  DOCUMENT_ROOT      $document_root;
+fastcgi_param  SERVER_PROTOCOL    $server_protocol;
+fastcgi_param  REMOTE_ADDR        $remote_addr;
+fastcgi_param  REMOTE_PORT        $remote_port;
+fastcgi_param  SERVER_NAME        $server_name;
+也可以在原文件里要添加一个这段文字
+fastcgi_param  SCRIPT_FILENAME    $document_root$fastcgi_script_name;即可或者把nginx.conf文件里location里的fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;改为fastcgi_param  SCRIPT_FILENAME    $document_root$fastcgi_script_name;也可以
+
+
+nginx配置文件
+main,
+
+events {
+}
+
+http {
+}
+
+server {
+}
+
+location {
+	directive <parameters>;  #每个指令以;结尾
+}
+其中location可以相互之间嵌套，可以放在在server与http里。server只可以只可以放在http里。
+server用来定义虚拟主机
+http关于http的相关信息
+events事件驱动相关信息
+location定义URI访问属性
+
+
+反向代理：
+proxy_pass：如果location中用的是正则表达式匹配，反射代理的服务器则不可以加url只可以有ip，且还要在服务里有与之正则表达式匹配的uri
+proxy_set_head X-Real-IP：一般proxy_set_head X-Real-IP $remote_addr这样访问服务器的客户端地址就不是nginx代理服务器的ip而是客户端的ip
+
+
+upstream(必须定义在server之外http之内)：
+server：定义后端服务器
+ weight：权重，可以省略
+ max_fails=NUMBER：最大错误次数
+ fail_timeout=TIME：最长错误时间，默认为10秒
+ backup：备用服务器地址
+ip_hash：把同一个客户端请求的信息始终定向到同一个服务器。nginx使用三种算法负载均衡(round-robin默认、ip_hash有这个就不可以在server后使用backup、least_conn检查server的链接状况找一个最少的)
+
+upstream websrve {  #定义一个上游服务器组
+	#ip_hash;
+	server 172.16.100.6 weight=1 max_fails=2 fail_timeout=4;
+	server 172.16.100.7 weight=1 max_fails=2 fail_timeout=4;
+	server 127.0.0.1:8080 backup;  #如果前两台服务器都挂掉，则所有服务指向这个服务
+}
+server {
+	...
+	location / {
+		proxy_pass http://websrve/;   #把网站全部代理到上面定义的上游服务器组
+		proxy_set_head X-Real-IP $remote_addr;
+	}
+	...
+}
+server {
+	listen 8080;
+	server_name localhost;
+	root /web/errorpages;
+	index index.html;
+}
+
+
+nginx缓存
+ 共享内存：存储键和缓存对象元数据
+ 磁盘空间：存储数据
+ 
+ proxy_cache_path：定义缓存空间，不可以定义在server中，要定义在http中。目录要事先存在
+  [levels = levels]：缓存目录的子目录，levels=1:2:1表示定义三级，第一级1个字符，第二级2个字符，第三级3个字符
+  keys_zone = name : size[inactive = time] [max_size = size] [loader_files=number] [loader_sleep = time] [loader_threshold = time]：用来存储键的区域keys_zone=first:20m名字为first大小为20m。
+ proxy_cache first：要定义在location中off表示不使用缓存，如果要使用那个缓存就写那个缓存keys_zone的name值。
+ proxy_cache_valid [code...] time：定义响应码是分别缓存多长时间，any表是任何状态，定义在location中
+
+
+http{
+	proxy_cache_path /nginx/cache/first levels=1:2:1 keys_zone=first:20m;
+	upstream websrve {  #定义一个上游服务器组
+		server 172.16.100.6 weight=1 max_fails=2 fail_timeout=4;
+		server 172.16.100.7 weight=1 max_fails=2 fail_timeout=4;
+		server 127.0.0.1:8080 backup;  #如果前两台服务器都挂掉，则所有服务指向这个服务
+	}
+	server {
+		...
+		#add_header X-Via $server_addr;#会在响应首部显示一个X-Via的信息，值为服务器端地址
+		#add_header X-Cache $upstream_cache_status;#会在响应首部显示一个X-Cache的信息,值为缓存的状态
+		add_header X-Cache "$upstream_cache_status from $server_addr";
+		location / {
+			proxy_pass http://websrve/;   #把网站全部代理到上面定义的上游服务器组
+			proxy_set_head X-Real-IP $remote_addr;
+			proxy_cache first;  #使用以上定义的first缓存
+			proxy_cache_valid 202 10m;  #如果页面状态是202则缓存10分钟
+		}
+		...
+	}
+	server {
+		listen 8080;
+		server_name localhost;
+		root /web/errorpages;
+		index index.html;
+	}
+}
+以上的不会再负载均衡，因为第一次访问以后有了缓存
+
+
+nginx另外常用的三种缓存：
+ open_log_cache：日志缓存
+ open_file_cache：
+ fastcgi_cache：
+
+
+rewrite：URL重写模块
+ if (CONDITION){
+ }
+ if通常只可以用在server跟location中，尤其是location中，一般建议放在location中使用
+
+测试：
+双目测试：
+ ~：被匹配就满足条件
+ !~：
+ =：
+ !=：
+ ~*：不区分大小写，被匹配就满足条件
+ !~*：
+  例子：
+   if ($request_method="POST"){
+   }
+   if ($request_uri ~* "/forum"){
+   }
+单目测试：
+
+
+valid_referers：一般放在location中，可用于防盗链
+ none：表是没有引用，即直接在浏览器中输入
+ blocked：后面写域名合法的域名，多个用空格隔开
+ if ($invalid_referer) {  #如果引用的域名不在blocked后的域名里，则返回403状态
+	return 403;
+ }
+
+
+location /images/ {
+	rewrite http://192.168.1.25/images/  #当访问/images/时跳转到http://192.168.1.25/images/
+}
+
+rewrite支持正则表达式，可以用在server, location, if上下文中
+
+location / {
+	root html;
+	index index.html;
+	rewrite "^/bbs/(.*)" http://172.16.100.19/forum/$1 last;  #当访问bbs后的所有路径时都把转向到http://172.16.100.19/forum/下
+}
+rewrite最后的last意思，及可替换的值
+last：本次重写完成之后，生启下一轮检查。一般都使用last
+break：本次重写完成后，直接执行后续操作。一般在可能发生循环时使用break
+redirect：
+permanent：
+
+
+location / {
+	proxy_pass http://172.16.100.6/;
+	if ($request_method="PUT") {  #如果请求的方法是put则把反射代理指向192.16.100.7上
+		proxy_pass http://172.16.100.7;
+	}
+}
+
+
+
+memcached依赖于libevent
+wget http://www.memcached.org/files/memcached-1.4.32.tar.gz
+yum install cyrus-sasl-devel
+tar -xvf memcached-1.4.32.tar.gz
+cd memcached-1.4.32
+./configure --enable-sasl --prefix=/usr/local/memcached
+make
+make install
+
+
+memcached命令选项
+-p：指定tcp协议的端口，默认是11211
+-U：指定udp协议的端口，0表示关闭udp协议
+-s：如果只在本地通信，可以指定监听在某一个套节字上，跟mysql相似
+-l：监听的地址
+-d：以服务的方式运行
+-r：最大核心文件限制
+-u：以那个用户的身份运行
+-m：以m为单位，memcached可用的最大内存空间
+-t：用于处理入站请求的最大线程数，仅在memcached编译时开启了支持线程数才有效
+-f：设定Slab Allocator定义预先分配内存空间大小固定的块时使用的增长因子
+-n：指定最小的slab chunk大小，单位是字节
+-M：当内存空间不够使用时返回错误信息，而不是按LRU算法利用空间
+-P：指定pid文件
+-L：使用最多的内存空间
+-S：启用sasl进行认证的功能
+-c：最大并发链接数
+
+
+/usr/local/memcached/bin/memcached -m 128 -n 20 -f 1.25 -u nobody -vv  #启用memcached
+/usr/local/memcached/bin/memcached -m 128 -n 20 -f 1.25 -u nobody -d
+
+telnet localhost 11211  #进入交互式模式
+add mykey 0 60 5
+hello   #添加一个mykey键值为hello
+get mykey  #得到mykey的值
+
+
+安装php的memcached扩展
+wget http://pecl.php.net/get/memcache-3.0.8.tgz
+tar -xvf memcache-3.0.8.tgz
+cd memcache-3.0.8
+/usr/local/php/bin/phpize
+./configure --with-php-config=/usr/local/php/bin/php-config --enable-memcache
+make
+make install
+vim /etc/php.d/memcache.ini
+extension = /usr/local/php/lib/php/extensions/no-debug-non-zts-20131226/memcache.so
+
+
+
+nginx与memcached结合
+server {
+	listen 80;
+	server_name localtion;
+	location / {
+		set $memcached_key $uri;
+		memcached_pass 127.0.0.1:11211;
+		default_type text/html;
+		error_page 404 @fallback;
+	}
+	location @fallback {
+		proxy_pass http://172.16.0.125;
+	}
+}
+
+
+
+一、配置php将会话保存至memcached中
+
+编辑php.ini文件，确保如下两个参数的值分别如下所示：
+session.save_handler = memcache
+session.save_path = "tcp://localhost:11211?persistent=1&weight=1&timeout=1&retry_interval=15"
+
+二、测试
+
+新建php页面setsess.php，为客户端设置启用session：
+<?php
+session_start();
+if (!isset($_SESSION['www.MageEdu.com'])) {
+  $_SESSION['www.MageEdu.com'] = time();
+}
+print $_SESSION['www.MageEdu.com'];
+print "<br><br>";
+print "Session ID: " . session_id();
+?>
+
+新建php页面showsess.php，获取当前用户的会话ID：
+<?php
+session_start();
+$memcache_obj = new Memcache;
+$memcache_obj->connect('localhost', 11211);
+$mysess=session_id();
+var_dump($memcache_obj->get($mysess));
+$memcache_obj->close();
+?>
+
+
+memadmin跟phpmyadmin一样，他是memcache的图形化管理界面，安装方法跟phpmyadmin一样

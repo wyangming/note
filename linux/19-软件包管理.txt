@@ -1,0 +1,673 @@
+linux软件包管理
+
+程序运行机制跟底层平台架构有非常大的关系
+C语言：源代码-->(编译)二进制格式
+源代码-->编译-->链接(调用库文件的过程)-->运行
+配置文件：
+dir=/path/to/somewhere
+程序组成部分：
+	二进程程序
+	库(共享库与本身提供的库)
+	配置文件
+	帮助文件
+
+/etc, /bin, /sbin, /lib
+	系统启动就需要用到的程序，主些目录不能挂载额外的分区，必须在根文件系统的分区上
+
+/usr/
+	bin
+	sbin
+	lib
+	操作系统核心功能，可以单独分区
+
+/usr/local
+	bin
+	sbin
+	lib
+	etc
+	man
+	安装操作系统以后安装的第三方软件，可以独立分区
+
+/opt
+
+/proc
+/sys
+	不能单独分区，默认为空
+
+/dev
+	设备，不能单独分区；
+	udev：2.6内核才引入，动态创建设备文件
+
+/home
+	用户家目录，单独分区
+
+/root
+	管理员家目录，不可以单独分区
+
+/var
+	建议单独分区，有日志信息
+
+/boot
+	内核，initrd(initramfs)，建议单独分区
+
+系统启动顺序：
+POST-->BIOS(HD)-->(MBR)bootloader(文件系统结构，ext2, ext3, xfs)-->内核
+
+程序：指令+数据
+	指令：芯片
+		CPU：普通指令，特权指令
+			指令集
+
+软件包管理器的核心功能
+	制作软件包
+	安装、卸载、升级、查询、校验
+
+Redhat, SUSE: RPM
+	Redhad Package Manager
+	RPM is package Manager
+Debian: dpt
+
+依赖关系：
+
+前端工具：yum, apt-get
+后端工具：RPM, dpt
+
+yum：Yellowdog Update Modifier
+
+rpm命令：
+	rpm：管理软件包
+		数据库/var/lib/rpm
+	rpmbuild：创建软件包
+
+安装、查询、卸载、升级、校验、数据库的重建、验证软件包等工作
+
+rpm命名：
+包：组成部分
+	主包：
+		bind-9.7.1-1.i586.el5.rpm
+	子包：
+		bind-libs-9.7.1-1.i586.el.rpm
+		bind-utils-9.7.1-1.i586.el.rpm
+包名格式：
+	name-version-release.arch.rpm
+	name：名称
+	version：版本号
+	bind-major.minor.release-release.arch.rpm
+主版本号：重大改进
+次版本号：某个子功能发生重大变化
+发行号：修正了部分bu，调整了一点功能
+
+bind-9.7.1.tar.gz
+
+rpm包：
+	二进制格式
+	源码格式：rpm作者下载源程序，编译配置完成后，制成rpm包
+	bind-9.7.1-1.x86_64.rpm 64位包
+	bind-9.7.1-1.i386.rpm 32位包
+	bind-9.7.1-1.noarch.rpm rmp包与平台无关
+	bind-9.7.1-1.el5.rpm 红帽5上的包
+	bind-9.7.1-1.ppc.rpm powerpc包
+
+uname -r或uname -a 查看操作系统的版本信息
+
+rpm：
+
+1、安装：
+	rpm -i /PATH/TO/PACKAGE_FILE：安装软件包
+		参数：
+			-h：以#显示进度，每个#表示2%
+			-v：显示详细过程
+			-vv：更详细过程
+			--nodeps：忽略依赖关系
+			--replacepkgs：重新安装，替换源有安装
+			--force：强行安装，可以实现重装或降级
+			--test：测试是否有依赖关系
+		例子：
+			rpm -ivh /PATH/TO/PACKAGE_FILE
+			rpm -ivvh /PATH/TO/PACKAGE_FILE
+2、查询
+	rpm -q PACKAGE_NAME：查询指定软件是否安装
+	rpm -qa PACKAGE_NAME：查询所有已经安装的软件
+		例子：
+			rpm -qa | grep "^z"：查询以z开头的软件包
+	rpm -qi PACKAGE_NAME：查询指定包的说明信息
+	rpm -ql PACKAGE_NAME：查询软件包安装后生成的文件列表
+	rpm -qc PACKAGE_NAME：查询指定包安装的配置文件
+	rpm -qd PACKAGE_NAME：查询指定包安装的帮助文件
+	
+	rpm -q --scripts PACKAGE_NAME：查询指定包中包含的脚本
+		有四类脚本：安装前、安装后、卸载前、卸载后
+	
+	rpm -qf /path/to/somefile：查询指定的文件是由那个rpm包安装生成的；
+
+如果某rpm包尚未安装，我们需查询其说明信息、安装以后会生成的文件：
+rpm -qpi /PATH/TO/PACKAGE_FILE
+rpm -qpl /PATH/TO/PACKAGE_FILE
+
+3、升级
+	rpm -Uvh /PATH/TO/NEW_PACKAGE_FILE：如果装有老版本的，则升级，否则安装
+	rpm -Fvh /PATH/TO/NEW_PACKAGE_FILE：如果装有老版本的，则升级，否则退出
+		--oldpackage：降级
+	rpm -Uvh --oldpackage /PATH/TO/NEW_PACKAGE_FILE：降级软件
+
+4、卸载
+	rpm -e PACKAGE_NAME：卸载，此软件包不能被其他软件包所依赖
+		--nodeps
+
+5、校验
+	rpm -V PACKAGE_NAME：校验
+
+6、重建数据库
+路径：/var/lib/rpm/下
+	rpm
+		--rebuilddb：重建数据库，一定会重新建立
+		--initdb：初始化数据库，没有才建立，有就不用建立
+
+7、检验来源合法性，及软件完整性
+加密类型：
+	对称：加密解密使用同一个密钥
+	公钥：一对儿密钥，公钥，私钥；公钥隐含于私钥中，可以提取出来，并公开出去；
+	单向：
+
+ls /etc/pki/rpm-gpg
+	RPM-GPG-KEY-redhat-release
+
+rpm -K /PATH/TO/PACKAGE_FILE
+	dsa, gpg：验正来源合法性，也即验证签名：可以使用--nosignature，略过此项
+	sha1, md5：验证软件包完整性；可以使用--nodigest，略过此项
+
+rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release：导入密钥文件
+
+
+
+XML, JSON：半结构化数据
+
+yum基于rpm命令
+
+yum仓库中的元数据文件：
+primary.xml.gz
+	所有rpm包的列表；
+	依赖关系；
+	每个RPM安装生成的文件列表；
+filelists.xml.gz
+	当前仓库中所有RPM包的所有文件列表；
+other.xml.gz
+	额外信息，RPM包的修改日志
+repomd.xml
+	记录的是上面三个文件的时间戳和校验
+comps*.xml：RPM包分组信息
+
+yum配置文件：/etc/yum.conf
+	cachedir：缓存路径
+	keepcache：
+	debuglevel：调试级别
+	logfile：日志
+	distroverpkg：发行版版本号
+	tolerant：
+	exactarch：
+	obsoletes：
+	gpgcheck：
+	plugins：
+
+如何为yum定义repo文件
+[Repo_Name]
+name=Description
+baseurl=
+	ftp://
+	http://
+	file:///
+enabled={1|0}：1启用0禁用
+gpgcheck={1|0}
+gpgkey=
+
+yum [options] [command] [package ...]
+	
+yum
+	参数：
+		-y：自动回答为yes
+		--nogpgcheck：
+	子命令：
+		install package1 [package2] [...]：安装
+		update [package1] [package2] [...]：升级
+		update-to [package1] [package2] [...]：升级到某个版本
+		check-update：有多少可用的更新
+		remove | erase package1 [package2] [...]：卸载
+		list [...]：列表
+			all
+			available：可用的，仓库中有但尚未安装的
+			installed：已经安装的
+			updates：可用的升级
+		info [...]：
+		provides | whatprovides feature1 [feature2] [...]：查看指定的文件或特性是由哪个包安装生成的；
+		clean [ packages | headers | metadata | dbcache | all ]：清缓存
+		makecache：创建缓存
+		groupinstall group1 [group2] [...]：安装组
+		groupupdate group1 [group2] [...]：组升级
+		grouplist [hidden] [groupwildcard] [...]：列出组
+		groupremove group1 [group2] [...]：删除组
+		groupinfo  group1 [group2] [...]：查看组信息
+		search string1 [string2] [...]：查找
+		shell [filename]：跟shell交互
+		resolvedep dep1 [dep2] [...]：
+		localinstall rpmfile1 [rpmfile2] [...]：
+		localupdate rpmfile1 [rpmfile2] [...]：
+		reinstall package1 [package2] [...]：
+		downgrade package1 [package2] [...]：降级
+		deplist package1 [package2] [...]：
+		repolist [all|enabled|disabled]：显示repo列表及其简要信息，enabled是默认的
+		help
+
+yum本地仓库设置：
+[base]
+name=local cdrom server
+baseurl=file:///media/cdrom/Server
+enabled=1
+gpgchek=0
+		
+RPM安装：
+	二进制格式：
+		源程序-->编译-->二进制格式
+			有些特性是编译选定的，如果编译时未选定此特性，将无法使用；
+			rpm包的版本会落后于源码包，甚至落后很多。
+
+定制：手动编译安装
+编译环境：开发环境
+开发库，开发工具
+
+c, c++
+GNU：c
+gcc：编译c语言
+g++：编译c++
+
+make：项目管理工具
+	makefile：定义了make(gcc, g++)按何种次序去编译这些源程序文件中的源程序
+
+automake：生成makefile文件
+	-->makefile.in
+autoconf,-->configure
+
+make install：安装
+
+编译安装的三步骤：
+前提：准备开发环境(编译环境)
+安装"Development Tools"和"Development Libraries"
+./configure
+	--help
+	--prefix=/path/to/somewhere：安装路径
+	--sysconfdir=/path/to/conffile_pahe：配置文件路径
+	功能：
+		让用户选定编译特性
+		检查编译环境
+make
+make install
+gcc g++:
+	yum install -y gcc gcc-c++
+openssl：
+	wget http://www.openssl.org/source/openssl-1.0.1r.tar.gz
+    tar -xzvf openssl-1.0.1r.tar.gz
+    cd openssl-1.0.1r
+    ./config
+	make
+	make install
+    
+pcre(需要先安装perl):
+	wget ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.37.tar.gz
+    tar -xzvf pcre-8.37.tar.gz
+    cd pcre-8.37
+    ./configure
+	make
+	make install
+    
+zlib:
+	wget http://zlib.net/zlib-1.2.8.tar.gz
+    tar -xzvf zlib-1.2.8.tar.gz
+    cd zlib-1.2.8
+    ./configure
+	make
+	make install
+
+wget http://tengine.taobao.org/download/tengine-2.1.2.tar.gz
+tar xf tengine-1.4.2.tar.gz
+cd tengine-1.4.2
+./configure --prefix=/usr/local/tengine --conf-path=/etc/tengine.conf --with-pcre=../pcre-8.37
+
+make
+make install
+/usr/local/tengine/sbin/nginx
+需要把/usr/local/tengine/sbin/nginx路径添加到环境变量里即/etc/profile文件的export PATH USER LOGNAME MAIL HOSTNAME HISTSIZE HISTCONTROL这行前面
+如果报error while loading shared libraries: libpcre.so.1: cannot open shared object file: No such file or directory这个错误，解决方法：
+在确认pcre安装的情况下在/lib或者/lib64位下查询有没有libpcre.so.0.0.1文件然后建立一个软连接ln -s /lib/libpcre.so.0.0.1 /lib/libpcre.so.1即可
+
+nginx
+iptables -I INPUT -p tcp --dport 80 -j ACCEPT 开放80端口
+
+
+apache 安装：
+	wget http://mirrors.noc.im/apache//apr/apr-1.5.2.tar.gz
+	tar -zxf apr-1.5.2.tar.gz
+	cd apr-1.5.2
+	./configure --prefix=/usr/local/apr
+	make
+	make install
+	wget http://mirrors.noc.im/apache//apr/apr-util-1.5.4.tar.gz
+	tar -zxf apr-util-1.5.4.tar.gz
+	cd apr-util-1.5.4
+	./configure --prefix=/usr/local/apr-util -with-apr=/usr/local/apr/bin/apr-1-config
+	make
+	make install
+	wget http://mirror.bit.edu.cn/apache//httpd/httpd-2.4.18.tar.gz
+	tar -zxvf httpd-2.4.18.tar.gz
+	cd httpd-2.4.18
+	./configure --prefix=/usr/local/apache --sysconfdir=/etc/httpd --with-apr=/usr/local/apr/bin/apr-1-config --with-apr-util=/usr/local/apr-util/bin/apu-1-config
+
+编译安装注意：
+	修改PATH变量，以能够识别此程序的二进制文件路径
+		修改/etc/profiles文件
+		在/etc/profile.d目录建立一个以.sh为名称的后缀文件，在里面定义export PATH=$PATH:/path/to/somewhere
+		例如：
+		vim /etc/profile.d/httpd.sh
+		export PATH=$PATH:/usr/local/apache/bin
+	默认情况下，系统搜索库文件的路径/lib, /usr/lib;要增添额外搜寻路径；
+		在/etc/ld.so.conf.d/中创建以.conf为后缀名的文件，而后把要增添的路径直接写至些文件中；
+		例子：
+		vim /etc/ld.so.conf.d/apr.conf
+		/usr/local/apr/lib
+		vim /etc/ld.so.conf.d/aprutil.conf
+		/usr/local/apr-util/lib
+		ldconfig：通知系统重新搜寻库文件
+			-v：重新搜导库的过程
+	头文件：输出给系统
+		默认：/usr/include
+		增添头文件搜寻路径，使用链接进行；
+			/usr/local/tengine/include/ /usr/include/
+			两种方式
+			ln -s /usr/local/tengine/include/* /usr/include/或
+			ln -s /usr/local/tengine/include /usr/include/tengine
+			
+			ln -s /usr/local/apr/include /usr/include/apr
+			ln -s /usr/local/apr-util/include /usr/include/aprutil
+			ln -s /usr/local/apache/include /usr/include/apache
+	man文件路径：安装在--prefix指定的目录下man目录：/usr/share/man
+		1、man -M /path/to/man_dir command
+		2、在/etc/man.config中添加一条MANPATH
+		例子：
+		vim /etc/man.config里MANPATH下添加MANPATH /usr/local/apache/man
+		
+		
+
+环境变量配置文件：/etc/profile文件
+添加环境变量，在/etc/profile文件件里在export PATH USER LOGNAME MAIL HOSTNAME HISTSIZE INPUTRC上面添加以下一行：
+	PATH=$PATH:/usr/local/tengine/sbin
+用source /etc/profile重读一下就可以使刚配置的环境变量生效
+
+netstat：网络状态
+	-r：显示路由表
+	-n：以数字方式显示路由表
+	
+	-t：显示当前建立的tcp连接
+	-u：显示udp连接
+	-l：显示监听状态的连接
+	-p：显示监听指定的套接字的进程的进程号及进程名
+例子：
+netstat -r
+netstat -rn
+q
+
+kill pid：根据一个进程号杀死pid
+
+
+写一个脚本能于同一个repo文件中创建多个yum源指向
+#!/bin/bash
+REPOFILE=/etc/yum.repos.d/$1
+if [ -e $REPOFILE ]; then
+ echo "$1 exists."
+ exit 3
+fi
+read -p "Repository ID:" REPOID
+until [ $REPOID == 'quit' ]; do
+ echo "[$REPOID]" >> $REPOFILE
+ read -p "Repository name:" REPONAME
+ echo "name=$REPONAME" >> $REPOFILE
+ read -p "Repository Baseurl:" REPOURL
+ echo "baseurl=$REPOURL" >> $REPOFILE
+ echo -e 'enabled=1\ngpgcheck=0' >> $REPOFILE
+ read -p "Repository ID:" REPOID
+done
+
+循环while, until, for
+break：提前退出循环
+continue：提前结束本轮循环，而进入下一轮循环
+
+while的特殊用法一
+while :;do
+
+
+done
+
+例子：
+#!/bin/bash
+while :; do
+ read -p "File path:" FILEPATH
+ [ $FILEPATH == 'quit' ] && break;
+ if [ -e $FILEPATH ]; then
+  echo "$FILEPATH exists."
+ else
+  echo "No $FILEPATH"
+ fi
+done
+echo "Quit."
+
+
+while的特殊用法二
+while read LINE; do
+
+done < /PATH/TO/SOMEFILE
+	从/PATH/TO/SOMEFILE文件件里每一次读一行
+	例子：
+		FILE=/etc/passwd
+		let I=0
+
+		while read LINE; do
+		  [ `echo $LINE | awk -F : '{print $3}'` -le 505 ] && continue
+		  [ `echo $LINE | awk -F : '{print $7}'` == '/bin/bash' ] && echo $LINE | awk -F : '{print $1}' && let I++
+		  [ $I -eq 6 ] && break
+		done < $FILE
+		
+		
+		判断脚本是否有语法错误：
+		until bash -n $1 &> /dev/null do
+			read -p "Syntax error, [Qq] to quit, other for editing:" CHOICE
+			case $CHOICE in
+			q|Q)
+				echo "Something wrong, quiting."
+				exit 5
+			*)
+				vim + $1
+			esac
+		done
+
+函数：功能, function
+	代码重用：
+库：
+
+
+
+脚本编程之函数：
+
+function：功能
+
+结构化编程，不能独立运行，需要调用时执行，可以被多次调用
+
+定义一个函数
+function FUNCNAME{
+	command
+}
+
+FUNCNAME(){
+	command
+}
+
+自定义执行状态返回值：
+return #
+0-255
+
+接受参数的函数：
+
+
+例子：
+	function SHOWMENU {
+	cat << EOF
+	d|D) show disk usages
+	m|M) show memory usages
+	s|S) show swap usages
+	q|Q) quit.
+	EOF
+	}
+
+	SHOWMENU
+	SHOWMENU
+	
+	
+	
+	function SHOWMENU {
+	cat << EOF
+	d|D) show disk usages
+	m|M) show memory usages
+	s|S) show swap usages
+	q|Q) quit
+	EOF
+	}
+
+	SHOWMENU
+
+	read -p "Your choice:" CHOICE
+
+	until [ $CHOICE == 'q' -o $CHOICE == 'Q' ]; do
+	  case $CHOICE in
+	  d|D) df -lh ;;
+	  m|M) free -m | grep "^Mem";;
+	  s|S) free -m | grep "^Swap";;
+	  *)
+
+	SHOWMENU
+	read -p "Your choice, again:" CHOICE
+	  esac
+
+	SHOWMENU
+
+	  read -p "Your choice:" CHOICE
+	done
+	
+	
+	
+	TWOINT() {
+	A=9
+	B=3
+	C=$[$A+$B]
+	echo $C
+	}
+
+	M=11
+	SUM=$[$M+`TWOINT`]
+	echo $SUM
+	
+	
+	
+	ADDUSER() {
+	USERNAME=hadoop
+	if ! id -u $USERNAME &> /dev/null; then
+	  useradd $USERNAME
+	  echo $USERNAME | passwd --stdin $USERNAME &> /dev/null
+	  return 0
+	else
+	  return 1
+	fi
+	}
+
+	ADDUSER
+
+	if [ $? -eq 0 ]; then
+	  echo "add user finished."
+	else
+	  echo "Failuer."
+	fi
+	
+	
+	
+	TWOINT() {
+	echo $[$1+$2]
+	}
+
+	SUM=`TWOINT 6 5`
+	echo $SUM
+	
+	
+	
+	TWOINT() {
+	echo $[$1+$2]
+	}
+
+	for I in {1..10}; do
+	  let J=$[$I+1]
+	  echo "$I plus $J is `TWOINT $I $J`"
+	done
+	
+	
+	
+	ADDUSER() {
+	USERNAME=$1
+	if ! id -u $USERNAME &> /dev/null; then
+	  useradd $USERNAME
+	  echo $USERNAME | passwd --stdin $USERNAME &> /dev/null
+	  return 0
+	else
+	  return 1
+	fi
+	}
+
+	for I in {1..10}; do
+	ADDUSER user$I
+
+	if [ $? -eq 0 ]; then
+	  echo "add user$I finished."
+	else
+	  echo "add user$I Failuer."
+	fi
+	done
+	
+	
+写一个脚本判断192.168.0.200-192.168.0.254之间的主机哪些在线	
+	PING(){
+	  if ping -c1 -W 1 $1 &> /dev/null;then
+		return 0
+	  else
+		return 1
+	  fi
+	}
+
+	for I in {200..254}; do
+	  PING 192.168.0.$I
+	  if [ $? -eq 0 ]; then
+		echo "192.168.0.$I is up."
+	  else
+		echo "192.168.0.$I is down"
+	  fi
+	done
+	
+	
+	
+	PING(){
+	  if ping -c1 -W 1 $1 &> /dev/null;then
+		return 0
+	  else
+		return 1
+	  fi
+	}
+
+	for I in {200..254}; do
+	  if PING 192.168.0.$I; then
+		echo "192.168.0.$I is up."
+	  else
+		echo "192.168.0.$I is down"
+	  fi
+	done

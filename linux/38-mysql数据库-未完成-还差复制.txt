@@ -1,0 +1,894 @@
+#my.cnf里一些服务器的配置注意的
+[mysqld]
+log_bin = /usr/local/mysql/binlog/mysql-bin   #二进制日志文件路径
+binlog_format = mixed    #二进制日志文件格式
+server-id = 1
+innodb_file_per_table = 1   #innodb表一个表一个表空间
+lower_case_table_names=1    #查询时不区分大小写
+event_scheduler = 1   #开户事件
+socket = /tmp/mysql.sock   #本地连接时用到的socket文件地址
+log_error = /mydata/data/centos6.err  #错误日志文件，默认在数据目录下，以hostname为名的.err文件
+log_warnings = 0   #是否在错误日志文件记录警告日志，1记录，0不记录
+sql_mode=NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES
+
+
+
+关系模型：结构化数据模型
+ 关系模型
+ 实体-关系模型
+ 对象关系模型：基于对象的数据模型
+ 半结构化数据模型：xml
+
+关系：关系代数运算
+
+
+DML：数据库操作语言
+ INSERT
+ DELETE
+ SELECT
+ UPDATE
+DDL：数据定义语言，定义操作RDB对象。要考虑约束
+ CREATE
+ DROP
+ ALTER
+DCL：数据控制语言，用于定义数据库中，用户的访问权限
+ GRANT
+ REVOKE
+
+RDB对象：库、表、索引、视图、用户、存储过程、存储函数、触发器、事件调试器
+ 约束(constraint)
+  域约束：数据类型的约束
+  外键约束：引用完整性约束
+  主键约束：某字段能唯一标识引字段所属的实体，并且不允许为空，一张表只能有一个主键
+  惟一性约束：每一行的某字段都不允许出现相同值，可以为空，一张表可以有多个唯一键
+  检查性约束：不会出现违反常理的数据
+
+关系型数据库
+ 表示层：所有的RDB对象
+ 逻辑层：存储引擎
+ 物理层：数据文件
+
+数据存储和查询
+ 存储管理器
+  权限及完整性管理
+  事物管理器
+  文件管理器
+  缓冲区管理器
+ 查询管理器
+  DML解析器
+  DDL解析器
+  DCL解析器
+  查询执行引擎
+
+关系运算：
+ 投影：只输出指定属性
+ 选择：只输出符合条件的行
+ 自然连接：具有相同名字的属性上取值相同的行
+ 笛卡尔积：两集合相乘
+ 并：就是集合运算
+
+
+
+SQL语言的组成部分：
+ DDL
+ DML
+ 完整性定义语言：DDL的一部分功能
+ 视图定义
+ 事物控制
+ 嵌入SQL和动态SQL
+ 授权：DCL
+
+表管理器：负责创建、读取或修改表定义文件；维护表描述符高速缓存；管理表锁；
+ 表结构定义文件
+
+表修改模块：表创建、删除、重命名、移除、更新或插入之类的操作
+表维护模块：检查、修改、备份、恢复、优化(碎片整理)及解析
+
+文件中记录组织：
+ 堆文件组织：一条记录可以放在文件中的任何地方
+ 顺序文件组织：根据“搜索码”值顺序存放
+ 散列文件组织：
+
+表结构定义文件，表数据文件
+
+表空间：table space
+
+数据字典：Data Dictionary
+ 关系的元数据：
+  关系的名字
+  字段名字
+  字段的类型和长度
+  视图
+  约束
+  
+  用户名字，授权，密码
+
+缓冲区管理器：
+ 缓存置换策略
+ 被钉住的块：不允许置换的块
+
+MySQL Server(mysqld, mysql)
+MySQL Cluster：mysql集群套件，没人用
+MySQL Proxy：代理服务器，用的最多的是读写分离，可以路由语句，基本没人用
+MySQL Adminitrator：可视化管理工具
+MySQL Query Browser：查询浏览器
+MySQL Workbench：已经把Adminitrator, Query Browser Workbench这三个整合到一块儿，是mysql的设计管理工具
+MySQL Migration Toolkit：移植工具箱，在mysql不同版本不同平台移植
+MySQL Embedded Server：嵌入式平台下使用的mysql
+MySQL Drivers and Connectors：驱动和链接
+
+主要用MySQL Server, MySQL Proxy, MySQL Drivers and Connectors, MySQL Migration Toolkit
+
+MySQL -> MariaDB, Percona
+Percona这个网站对于学习mysql很有帮助
+
+
+源码安装MySQL
+yum groupinstall "Development Libraries" "Development Tools"
+wget https://cmake.org/files/v3.6/cmake-3.6.2.tar.gz   #mysql是用cmake编译的
+wget http://cdn.mysql.com//Downloads/MySQL-5.6/mysql-5.6.33.tar.gz  #这里用5.6版本5.7还没有稳定
+tar xf cmake-3.6.2.tar.gz
+tar -xvf mysql-5.6.33.tar.gz
+cd cmake-3.6.2  #先安装cmake，安装到默认目录下
+make
+make install
+which cmake
+mkdir -pv /mydata/data   #给mysql创建数据存放位置
+groupadd -r mysql
+useradd -r -g mysql -s /sbin/nologin mysql   #创建mysql的用户组
+chown -R mysql.mysql /mydata/data
+which cmake  #查看cmake命令的安装目录
+yum install ncurses ncurses-devel
+cd ../mysql-5.6.33
+cmake . -LH   #得到mysql的安装帮助
+cmake . -DCMAKE_INSTALL_PREFIX=/usr/local/mysql -DMYSQL_DATADIR=/mydata/data -DSYSCONFDIR=/etc -DWITH_INNOBASE_STORAGE_ENGINE=1 -DWITH_ARCHIVE_STORAGE_ENGINE=1 -DWITH_BLACKHOLE_STORAGE_ENGINE=1 -DWITH_READLINE=1 -DWITH_SSL=system -DWITH_ZLIB=system -DWITH_LIBWRAP=0 -DMYSQL_UNIX_ADDR=/tmp/mysql.sock -DDEFAULT_CHARSET=utf8 -DDEFAULT_COLLATION=utf8_general_ci -DDOWNLOAD_BOOST=1 -DWITH_BOOST=/usr/local/boost
+make
+make install
+cd /usr/local/mysql
+chown -R :mysql /usr/local/mysql  #改属组
+scripts/mysql_install_db --user=mysql --datadir=/mydata/data  #初始化数据库，当然要记下初始的密码
+bin/mysqld --initialize --user=mysql --datadir=/mydata/data   #mysql5.7初始化方式，percona-server5.7也是
+cp support-files/my-default.cnf /etc/my.cnf
+cp support-files/mysql.server /etc/init.d/mysqld
+chkconfig --add mysqld
+chkconfig --list mysqld
+vim /etc/init.d/mysqld   #修改以下两项
+basedir=/usr/local/mysql
+datadir=/mydata/data
+#加入环境变量
+vim /etc/profile.d/mysql.sh
+export PATH=$PATH:/usr/local/mysql/bin
+#退出后启动mysql
+. /etc/profile.d/mysql.sh
+service mysqld start
+bin/mysql  #登录
+show databases;  #显示数据
+show engines;  #显示支持的存储引擎
+update user set password=PASSWORD('123456') where user='root';  #更改密码
+alter user 'root'@'localhost' identified by '123456';  #mysql5.7要用这种方式修改密码，percona-server5.7也是
+flush privileges;  mysql重读权限表
+
+
+MySQL客户端工具：
+mysql：常用
+ -u
+ -h
+ -p
+ --database | -D DATABASENAME：指定连接时使用的数据库,连上后可用SELECT DATABASE()1来查看当前使用的数据库
+ 交互式命令：
+  source | \.  ：可以载入一个sql文件来执行
+  exit | \q    ：退出mysql
+  status | \s  ：查看状态
+  clear | \c   ：可以提前结束语句，不执行写之前的语句
+  \g           ：无论语句结束符是什么，直接将此语句送至服务器端执行
+  \G           ：无论语句结束符是什么，直接将此语句送至服务器端执行，而且结果以坚排方式显示
+  system | \!  ：不用退出执行shell命令
+  \W           ：如果语句有警告信息，在语句结束后显示警告信息
+  \w           ：如果语句有警告信息，在语句结束后不显示警告信息
+  \#           ：对于新建的对象，支持补全信息
+ 服务器端命令：
+  help KEYWORD ：得到服务器端命令的帮助
+mysqldump
+mysqladmin：常用，用于管理
+ create DATABASE：创建数据库
+ drop DATABASE：删除数据库
+ ping：测试mysql服务器是否在线
+ processlist：显示mysql上正在执行的进程列表
+ status：mysql的状态
+  --sleep n：显示频率，每隔多少次显示一次状态
+  --count n：一共显示多少次状态
+ extends-status：显示状态变量
+ variables：显示服务器变量
+ flush-privileges：让mysql重读授权表，等同于reload
+ flush-tables：关闭所有打开的表
+ flush-status：重置大多数服务器状态变量
+ flush-logs：日志滚动，二进制和中继日志
+ flush-hosts：清楚主机的内部信息
+ refresh：相当于同时执行flush-privileges与flush-logs
+ shutdown：关闭mysql服务器进程
+ version：显示mysql版本号与状态信息
+ start-slave：启动复制，启动从服务器的复制线程：SQL thread与IO thread两个线程
+ stop-slave：停止复制线程
+mysqlcheck
+mysqlimport
+
+以上共同的选项：
+--protocol：指定使用的协议，只有tcp
+
+
+如果想直接用mysql登录不指定用户名密码
+vim .my.cnf  #在自己的家目录下，内容如下
+user = root
+password = 123456
+host = localhost
+#退出后可以直接用mysql就可以登录
+
+
+数据文件说明：
+MyISAM
+ 每个表都有三个文件
+ frm：表结构
+ myd：表数据
+ MYI：表索引
+InnoDB：支持所有表共享一个表文件，不支持很多高级特性，建议使用一个表一个表空间，默认没打开在配置文件[mysqld]下innodb_file_per_table = 1来启用
+ frm：表结构
+ ibd：表空间，表空间同时存储数据与索引，如果不改innodb_file_per_table所有的表与所有数据都在一个文件里
+
+每个数据库里的opt文件是记录数据库默认的排序规则与字符集
+
+
+客户端组件：mysql, mysqladmin, mysqldump, mysqlimport, mysqlcheck
+服务器端组件：mysqld, mysqld_safe, mysqld_multi
+
+
+配置文件:/etc/my.cnf --> /etc/mysql/my.cnf --> $MYSQL_HOME/my.cnf --> --defalut-extra-file=/path/to/somefile --> ~/.my.cnf  (最后被找到的最后生效)
+[mysqld]
+innodb_file_per_table = 1  #让InnoDB表类型的每个表都有一个表空间
+lower_case_table_names=1   #查询时表名称忽略大小写
+basedir   #安装目录
+datadir   #数据目录
+port    #端口号
+socket   #本地连接时用到的socket文件地址
+
+
+DBA：
+ 开发DBA：数据库设计、SQL语句、存储过程、存储函数、触发器
+ 管理DBA：安装、升级、备份、恢复、用户管理、权限管理、监控、性能分析、基准测试
+
+
+服务器端命令：
+show databases：显示数据
+show engines：显示支持的存储引擎
+flush privileges：重读权限表
+show table status like TABLENAME：查看一个表的状态信息
+ show table status like 'user'\G  一般这样查看，横向显示信息太多
+show character set：显示所有支持的字符集
+show collation：显示各个字符集的排序规则
+show global variables like 'sql_mode'：查看sql模型
+show indexes from TABLENAME：查看一个表的索引
+ show indexes from courses; ：查看courses表的索引
+desc TABLENAME：查看表结构
+show create ：显示查看某个对象创建时的语句
+
+服务器端mysqld
+mysqld --help --verbose  #显示mysql可以写在配置文件里的指令
+
+
+mysql数据类型
+ 数值型
+  精确型数值：如果后的括号有数字表示要显示多少位的数字
+   TINYINT：1个字节，定点数值，-128--127 0--255
+   SMALLINT：2个字节，-32768--32767 0-65535
+   MEDIUMINT：3个字节，-8388608--8388607 0-16777215
+   INT：4个字节，-2147483648--2147483647  0-4294967295
+   BIGINT：8个字节，-9223372036854775808--9223372036854775807 0-18446744073709551615
+   DECIMAL：定点数值
+  近似数值
+   FLOAT：4个字节
+   DOUBLE：8个字节
+   BIT：
+   REAL：
+ 字符型
+  CHAR：定长不区分大小写，最多只可以存255个字符
+  VARCHAR：变长不区分大小写，最多只可以存65535个字符，每个varchar类型都会多点一个空间，如varchar(3)占的是4个空间，会多一个结束符。
+  BINARY：定长不区分大小写
+  VARBINARY：变长区分大小写
+  TINYBLOB：微，区分大小写，255byte
+  BLOB：二进制大对象，区分大小写，是字节字符串，跟text是一样的，64kb
+  MEDIUMBLOB：标准，区分大小写，16Mb
+  LONGBLOB：长，区分大小写，4GB
+  TINYTEXT：微，区分大小写，最多只可以存255个字符，多占1个字节
+  TEXT：文本，区分大小写，最多只可以存65535个字符，多占2个字节。在text上创建索引时不可以索引整个字段，但是char是可以的
+  MEDIUMTEXT：标准，区分大小写，最多只可以存16777215个字符，多占3个字节
+  LONGTEXT：长，区分大小写，最多只可以存4294967295个字符，多占4个字节
+  ENUM：枚举，最多可以有65535个枚举
+  SET：集合，1到64个字符串，在表里存储的是一个索引，不可以创建索引
+ 日期时间型
+  date：只有年月日，1000-01-01到9999-12-31，3byte
+  time：只有时分秒，-838:59:59到838:59:58，3byte
+  datetime：年月日，时分秒，1000-01-01 00:00:00到9999-12-31 23:59:59，3byte
+  timestamp：时间戳，存储的是unix元年开始到某一时刻中间经过的秒数，1970-01-01 00:00:00到2038-01-08 22:14:07，4byte
+  year(2)：年，00到99，1byte
+  year(4)：年，1901到2155，1byte
+ 布尔型
+  BOOLEAN
+  BOOL
+
+
+数据类型的域属性：修饰符
+ auto_increment：自动增长，只可以在整数上用
+  只可以是正整数即声明的时候要UNSIGNED
+  一定不可以为空
+  一定要有索引：一般是主键或者非空索引
+  select last_insert_id()：可以查看自动增长到那里了
+数据类型：
+1、存入的值类型；
+2、占据的存储空间；
+3、定长还是变长；
+4、如何比较及排序；
+5、是否能够索引；
+
+
+MySQL的SQL模型：
+ ANSI QUOTEST："与`只可以用来引用字段名称表名等，要引用字符得用'
+ IGNORE_SPACE：在内建函数中忽略多余的空白字符
+ STRICT_ALL_TABLES：如果不设置则所有的非法数据都允许，会返回一个警告说数据不符合要求；设置了是只要违反就不允许，并返回一个错误
+ STRICT_TRANS_TABLES：向一个支持事物的表中提供非法数据时是不允许的，而且返回一个错误
+ TRADITIONAL：
+
+
+MySQL服务器变量
+ 按作用域分为两类
+  全局变量
+   show global variables：查看全局变量
+    show global variables like 'sql_mode'
+   select @@global.
+    select @@global.sql_mode
+  会话变量
+   show [session] variables：查看会话变量session可以省略
+    show variables 'sql_mode'
+   select @@session.
+    select @@session.sql_mode
+ 按生效时间分为两类
+  动态：可即时修改
+  静态
+   写在配置文件中
+   通过参数传递给mysqld
+ 按生效方式
+  动态
+   全局：对当前会话无效，只对新建会话有效；
+   会话：即时生效，但只对当前会话有效
+  静态
+ 服务器变量：@@变量名
+  显示：select
+  设定：set GLOBAL | SESSION 变量名='value'
+   set global sql_mode='strict_all_tables'
+
+在表中键也称作约束，可用作索引，属于特殊索引(有特殊限定)：B+Tree。
+索引只可以创建跟删除，不可以修改。
+truncate table_name：清空表，并重置计数器，即自增计数
+
+
+锁：
+ 读锁：共享锁
+ 写锁：独占锁
+  LOCK TABLES TABLE_NAME {READ|WRITE};
+  UNLOCK TABLES;
+
+锁粒度：从大到小，MySQL服务器仅支持表级锁，行锁需要由存储引擎完成；
+ 表锁：
+ 页锁：
+ 行锁：
+
+一般锁是由数据库自己管理，除非特殊情况，比说实现数据库热备份
+
+
+多事物同时执行：彼此之间不影响的方式进行并行；
+ 事物之间交互：
+  通过数据集
+
+事物：CPU, I/O
+ RDBMS：ACID(原子性，一致性，隔离性，持久性)
+  Automicity：原子性，事物所引起的数据库操作，要么都完成，要么都不执行
+  Consistency：一致性
+  Isolation：隔离性，靠事物调度来实现
+   事物调度：事务之间影响最小
+   MVCC：多版本并发控制
+  Durability：持久性，一但事物成功完成，系统必须保证任何故障都不会引起事物表示出不一致性
+   1、事物提交之前就已经写出数据至持久性存储
+   2、结合事物日志完成；
+    事物日志：顺序IO
+	数据文件：随机IO
+ 事物状态：
+  活动状态：active
+  部分提交：最后一条语句执行后
+  失败的：提交没完成
+  中止的：
+  提交的：提交完成
+事物隔离性(级别)：
+ READ UNCOMMITTED：读未提交
+ READ COMMITTED：读提交
+ REPATABLE READ：可重读，默认
+ SERIABLIZABLE：可串行化
+
+start tansaction：启动事物
+commit：提交
+rollback：回滚
+
+
+事物：并发执行
+ 1、提高吞吐量和资源利用率
+ 2、减少等待时间
+
+事物调度
+ 可恢复调度：
+ 无级联调度：
+
+并发控制依赖的技术手段：
+ 锁
+ 时间戳
+ 多版本和快照隔离
+
+
+如果没有明确启动事物：
+ autocommit：能实现自动提交，每一个操作都直接提交，这是个变量。
+ set autocommint=0 ：关闭事物自动提交
+在事物引擎上建议：明确使用事物，并且关闭自动提交；
+
+事物保存点：SAVEPOINT
+ rollback to SID：回滚到那个事物保存点,SID是保存点的ID
+
+
+
+用户和权限管理：
+user表：用户账号、全局权限与非权限字段
+db表：数据库级别的权限定义
+host表：已废弃，整合入user表
+tables_priv表：表级别权限
+columns_priv表：列级别权限
+procs_priv表：存储过程与存储函数相关权限
+proxies_priv表：代理用户权限
+
+用户账号：
+ 用户名@主机
+  用户名：16字符以内
+  主机：
+   主机名：
+   IP
+   网络地址：
+    172.16.0.0/16  172.16.0.0/255.255.0.0
+   通配符：%
+    172.16.%.%
+	%.f273c.com
+
+--skip-name-resolve   #可以直接登录mysql服务器，不再使用名称解析，建议加上这个参数
+
+触发器：主动数据库
+ INSERT, DELETE, UPDATE
+
+CREATE USER username@host [IDENTIFIED BY 'PASSWORD'];  #创建用户
+flush privileges;  #让mysql重读授权表，等同于reload
+GRANT priv_type [(column_list)] [, priv_type [(column_list)]] ON [object_type] priv_level TO user_specification [, user_specification] [IDENTIFIED BY 'password'];   #用户授权
+show grants for 'username@host';   #查看某个用户的授权信息
+DROP USER username@host;   #删除用户
+RENAME USER old_name TO new_name;  #名称需要加用户名与主机即：username@host格式。
+REVOKE priv_type [(column_list)] [, priv_type [(column_list)]] ON [object_type] priv_level FROM user [, user];   #取回权限
+
+忘记管理员密码：
+启动mysqld_safe时传递两个参数：
+ --skip-grant-tables
+ --skip-networking   #禁止网络访问，只可以本机访问，为了安全
+通过更新授权表方式直接修改其密码，而后移除这两项重启服务器即可。
+
+service mysqld stop
+vim /etc/my.cnf   #在mysqld下添加以下两行
+skip-grant-tables
+skip-networking
+#或者
+vim /etc/init.d/mysqld  #找到$bindir/mysqld_safe --datadir="$datadir" --pid-file="$mysqld_pid_file_path" $other_args >/dev/null &改为
+$bindir/mysqld_safe --skip-grant-tables --skip-networking --datadir="$datadir" --pid-file="$mysqld_pid_file_path" $other_args >/dev/null &
+#退出
+service mysqld start
+mysql  #直接登录系统
+use mysql;
+update user set PASSWORD=PASSWORD('123456') where user='root';  #修改密码
+update MySQL.user set authentication_string=password('renhang2centos-') where user='root' ; #5.7以后没有password这个字段要用这个才可以，密码必须含有数字，小写或大写字母，特殊字符
+alter user 'root'@'localhost' identified by 'renhang2centos-';
+set password=password("renhang2centos-");
+#退出后把上面加的内容去掉再启动mysql
+service mysqld stop
+service mysqld start
+
+
+
+日志管理：
+
+错误日志
+一般查询日志
+慢查询日志：
+二进制日志：只记录DML, DDL的操作。任何引起可可能引起数据库变化的操作；
+ 复制、即时点恢复；
+ 只可以用mysqlbinlog命令来查看
+ mysql服务器只要重启一次，日志就会滚动一次
+ 二进制日志的格式：
+  基于语句：statement
+  基于行：row
+  混合方式：mixed
+ 二进制日志事件：
+  产生时间
+  相对位置
+ 二进制日志文件：
+  索引文件
+  二进制日志文件
+ 二进制日志默认放在数据目录上，不要与数据目录放在同一块磁盘上，应该分开存放。
+中继日志：从主服务器上复制来的二进制日志文件，并保存为日志文件
+事物日志：ACID，将随机IO转换为顺序IO，只有事物存储引擎才能用到事物日志
+
+show global variables like '%log%';   #查看日志变量
+
+错误日志：error log
+ 记录的信息
+  服务器启动和关闭过程中的信息
+  服务器运行过程中的错误信息
+  事件调试器支行一个事件时产生的信息
+  在从服务器上启动从服务器进程时产生的信息
+ 配置
+  log_error：错误日志文件
+  log_warnings：是否在错误日志文件记录警告日志，1记录，0不记录
+
+一般查询日志：general_log
+ general_log：是否启用一般查询日志，一般默认都是关闭的
+ general_log_file：一般查询日志文件
+ log_output：记录一般查询日志的方式TABLE|FILE|NONE。默认是FILE,
+
+慢查询日志：当查询语句执行时间超过变量long_query_time设置的时间时都叫做慢查询。这里执行的时长为实际执行时长，非在cpu上的执行时长，因此，负载较重的服务器上更容易产生慢查询。其最小值 为0，默认为10，单位是秒。也支持毫秒级的解析度。
+ slow_query_log：是否记录慢查询，默认关闭
+ slow_query_log_file：文件存放位置
+ long_query_time：设置慢查询超出的时间
+开启慢查询日志可以设置long_query_time时间记录查询慢的语句，来分析服务性能
+
+二进制日志：Binary Log
+ 启用二进制日志
+  vim /etc/my.cnf  #在mysqld下添加以下两行即可
+  log-bin = mysql-bin
+  binlog_format = mixed
+  server-id = 1
+ 查看命令：
+  mysql> show master status;  #查看当前使用的二进制文件,Position表示上一个操作结束的位置
+  mysql> show binlog events in 'mysql-bin.000001';  #查看二进制文件的记录信息
+  mysql> show binlog events in 'mysql-bin.000001' from 107;  #查看二进制文件的记录信息,从pos的107开始显示
+  mysql> flush logs;  #手动实现日志滚动，只会滚动二进制日志，从服务器上只会滚动中继日志
+  mysql> purge binary logs to 'mysql-bin.000003';  #把mysql-bin.000003之前的日志全部删除
+  mysql> show binary logs;  #查看当前所拥有的所有二进制文件
+ mysqlbinlog：
+  --start-datetime
+  --stop-datetime
+  或者
+  --start-position
+  --stop-position
+  例子：
+   mysqlbinlog mysql-bin.000001  #查看二进制文件的所有信息，是在服务器的数据目录下
+   mysqlbinlog --start-datetime='2016-10-07 0:16:59' mysql-bin.000001  #显示2016-10-07 0:16:59以后的信息
+ 配置选项：
+  binlog_format：二进制文件格式
+  log_bin：是否记录二进制文件日志，如果写在配置文件里表示二进制文件前缀的名称，在配置文件中log_bin = /usr/local/mysql/binlog/mysql-bin这样写可以更改mysql二进制文件的路径，但要更改目录的属主改组都是mysql
+  binlog_cache_size：二进制日志缓存大小
+  max_binlog_cache_size：最大二进制日志缓存大小
+  binlog_stmt_cache_size：二进制事物语句缓存大小，binlog_cache_size是根据它的值一决定的，不建意调的太大，这样丢失的数据也会太大
+  max_binlog_stmt_cache_size：二进制事物语句缓存大小上限
+  sql_log_bin：是否记录二进制日志文件，在实现数据库恢复时非常有用，可以即时生效
+  sql_log_off：是否禁止将一般查询日志类型信息记录进查询日志文件，默认为OFF，表示不禁止记录功能
+  sync_binlog：设定多入同步一次二进制日志至磁盘文件中，0表示不同步，任何正数值都表示对二进制每多少次写操作之后同步一次，当autocommit的值为1时，每条语句的执行都会引起二进制日志同步，否则，每个事物的提交会引起二进制日志同步。
+  expire_logs_days：二进制日志的过期时间，0为不过期
+
+
+任何关于开放或者关闭的变量都可以使用set global variable=  来即时生效，但只要是牵扯到配置文件位置的都必须手动编写配置文件重启服务器才可以生效。
+
+中继日志：
+
+事物日志：
+ 事物存储引擎用于保证原子性
+ 配置选项：
+  innodb_flush_log_at_trx_commit：0每秒同步，并执行磁盘flush操作；1每事物同步，并执行磁盘flush操作；2每事物同步，但不执行磁盘flush操作；
+  innodb_log_buffer_size：内存缓存大小
+  innodb_log_file_size：日志文件大小
+  innodb_log_files_in_group：事物日志组有几个文件
+  innodb_log_group_home_dir：事物日志组放到那个地方，默认放在那里，就是那个ib_logfile文件，看情况决定是否分磁盘存放
+  innodb_mirrored_log_groups：是否对日志文件组做镜像
+
+
+MySQL存储引擎
+MyISAM：
+ 不支持事物
+ 表锁
+ 不支持外键
+ B树索引、FULLTEXT索引、空间索引
+ 支持表压缩
+InnoDB：
+ 事物
+ 行级锁
+ B树索引、聚簇索引、自适应hash索引
+ 表空间，raw磁盘设备(可以将数据放在没有文件系统的设置上，即支持裸设备)
+ 默认不支持一个表一个表空间，是所有表一个表空间。不支持很多高级特性，建议使用一个表一个表空间，默认没打开在配置文件[mysqld]下innodb_file_per_table = 1来启用，或者set innodb_file_per_table=ON
+FEDERATED：
+CSV：利用文本文件的格式存储数据
+ARCHIVE：主要实现归档
+PERFORMANCE_SCHEMA：内存存储引擎，MySQL自己在内部用于创建临时表
+BLACKHOLE：黑洞存储引擎
+
+一个数据库里不建议使用混合存储引擎，最好使用统一的。
+
+
+
+数据备份和恢复
+
+备份类型
+ 热备份：读写操作不受影响
+ 温备份：仅可以执行读操作
+ 冷备份：离线备份：读、写操作均中止
+备份方式
+ 物理备份：直接复制数据文件
+ 逻辑备份：将数据导出至文本文件中
+备份策略
+ 完全备份：备份全部数据
+ 增量备份：仅备份上次完全备份或增量备份以后变化的数据
+ 差异备份：仅备份上次完全备份以来变化的数据
+
+备份里需要备份数据、配置文件、日志(二进制日志，事物日志)
+
+热备份：
+ MyISAM：借助lvm实现热备份或者使用温备份
+ InnoDB：xtrabackup(物理备份), mysqldump
+
+实现离线备份：
+MySQL --> 做个从服务器 --> 备份时从服务器停下来(或者把从进程停掉) --> 备份完里再启动
+
+物理备份：备份速度快，还原速度快。跨平台可能有问题，可能有些存储引擎根文件系统有关，即可移植能力差。
+逻辑备份：备份速度慢，还原速度慢。丢失浮点数精度；方便使用文本处理工具直接对其处理，可移植能力强，还可以跨mysql版本。
+
+备份策略：根据数据变化频率与变化量和还原时长决定使用完全+增量还是完全+差异
+ 完全+增量：还原时长大。
+ 完全+差异：
+
+MySQL备份工具：
+mysqldump：逻辑备份工具，MyISAM(温)，InnoDB(热备份)
+mysqlhostcopy：物理备份工具，温备份实际是冷备工具
+
+文件系统工具备份:
+cp：冷备
+lv：逻辑卷的快照功能，几乎热备
+ mysql> FLUSH TABLES;
+ mysql> LOCK TABLES;
+ 
+ 创建快照：释放锁，而后复制数据
+ InnoDB：需要看着存储引擎把事物处理完后再进行创建快照备份
+
+第三组工具：
+ ibbackup：商业工具
+ xtrabackup：开源工具，比ibbackup性能还好。用它好
+
+
+mysqldump：逻辑备份
+ mysqldump(完全备份)+二进制日志
+ 完全+增量
+
+备份单个数据库，或者库中特定表
+ mysqldump DB_NAME [tb1] [tb2]; #备份一个数据库，或者数据库里的表，多个表用空格分隔，这个方式不会创建数据库，如果要恢复得先建一个数据库
+  用法：mysqldump -uroot -hlocalhost -p test > /root/test.sql  #把数据库test备份到test.sql这个文件里
+ --master-data={0|1|2}
+  0：不记录二进制日志文件及位置
+  1：以CHNAGE MASTER TO的方式记录位置，可用于恢复后直接启动从服务器
+  2：以CHANGE MASTER TO的方式记录位置，但默认被注释
+  用法：
+   mysqldump -uroot -hlocalhost -p --master-data=2 test > /root/test.sql  #test.sql文件里会有CHANGE MASTER TO MASTER_LOGFILE='', MASTER_LOG_POST=  这些字样，是关于二进制日志文件的信息
+ --lock-all-tables：备份之前锁定所有表
+ --flush-logs：锁完表后执行日志滚动
+ --single-transaction：如果指定库中的表类型均为InnoDB,可使用此项启用热备，但是用了此项就不要用--lock-all-tables一块用了
+ --all-databases：备份所有库，会自动创建数据库
+ --databases DB_NAME, DB_NAME, ... ：备份多个库，会自动创建数据库
+ --routines：备份存储过程与存储函数
+ --triggers：备份触发器
+ --events：备份事件
+
+mysql> flush tables with read lock;   #在用mysqldump之前先打开一个会话，锁表。直接用mysqldump备份会在时间点上不一致
+mysql> flush logs;
+mysql> show binary logs;  #滚动一下日志，然后查看一个从那个文件开始的，记录下来，以做到以后恢复备份后可以完全恢复数据。
+mysql> unlock tables;  #在备份之后释放锁
+
+备份策略：周完全+每日增量
+ 完全备份：mysqldump
+ 增量备份：备份二进制日志文件(flush logs流动一下日志，直接复制二进制日志文件)
+
+mysqldump例子：
+mysqldump -uroot -hlocalhost -p --master-data=2 --flush-logs --all-databases --lock-all-tables > /root/alldatabases.sql  #完全备份
+#登录到mysql上
+mysql> purge binary logs to 'mysql-bin.000011';  #把mysql-bin.000011之前的二进制文件删除，mysql-bin.000011在完全备份时--master-data=2参数已经在备份文件里指定，一般是先复制后再删除
+mysql> show binary logs;  #查看剩下的二进制日志文件
+#这个时候打开数据库进行一些操作
+mysql> flush logs;  #滚动一下日志日志
+#然后到二进制文件的目录把滚动之前的日志复制一份儿或者用以下方式
+mysqlbinlog mysql-bin.000011 > /root/mon-incremental.sql  #用mysqlbinlog日志把二进制格式存放到一个数据库文件里，到时候用于复制
+#把所有有关于数据库的数据文件全部删除，但一定不要删除二进制文件，之前增量备份之后的二进制文件也要保存
+#想办法关掉mysql，如果关不掉直接killall mysql
+cd /usr/local/mysql/
+scripts/mysql_install_db --user=mysql --datadir=/mydata/data   #不要启动mysql先初始化数据库
+service mysqld start
+#登录到数据库上关闭二进制日志记录
+mysql> set sql_log_bin=0;
+mysql> \. /root/alldatabases.sql  #完全备份还原
+mysql> \. /root/mon-incremental.sql   #增量备份还原
+mysqlbinlog mysql-bin.000012 > /root/temp.sql   #增量备份之后的二进制文件，导成sql文件
+mysql> \. /root/temp.sql  #还原增量备份之后操作的数据文件
+#或者用这样的方法
+mysql -uroot mysql-bin.000012 | mysql -uroot -hlocalhost -p
+
+mysqldump合适数据量不大的数据库，如果数据库数据大就不适合mysqldump
+
+
+逻辑备份：
+ 1、浮点数据丢失精度；
+ 2、备份出的数据更占用存储空间；压缩后可大大节省空间；
+ 3、不适合对大数据库做完全备份；
+
+对InnoDB：
+ mysql> flush tables with read lock;  #即便对InnoDB进行些操作，如果当时有一个事物在处理，需要等好长时间。有时，如果写上，还有后台需要同步事物日志，也就是说后台还在做写操作。还要用show engine innodb status;观察InnoDb事物状态，等没有写操作的时候才可以备份。所以当表类型是InnoDB是一定要用--single-transaction选项。
+
+select备份单表数据
+ select * into outfile '/path/to/somefile.txt' from TABLE_NAME [WHERE CLAUSE];  #备份
+ load data infile 'path/to/somefile.txt' into table TABLE_NAME;  #还原，TABLE_NAME必须事先创建出来。这个是不会写进二进制日志文件
+ 
+几乎热备：LVM
+ snapshot：快照备份
+  前提：
+   1、数据文件要在逻辑卷上；
+   2、此逻辑卷所在的卷组必须有足够空间使用快照卷；
+   3、数据文件和事物日志要在同一个逻辑卷；
+  步骤：
+   1、打开会话，施加读锁，锁定所有表；
+    mysql> flush tables with read lock;
+	mysql> flush logs;
+   2、通过另外一个终端，保存二进制日志文件及相关位置信息；
+    mysql -uroot -hlocalhost -p -e 'show master status\G' > /path/to/master.info
+   3、创建快照卷
+    lvcreate -L # -s -p r -n LV_NAME /path/to/source_lv
+   4、释放锁
+    mysql> unlock tables;
+   5、挂载快照卷，备份
+    mount
+	cp
+   6、删除快照卷
+   7、增量备份二进制日志
+
+快照卷备份：
+mysql> flush tables with read lock;
+mysql> flush logs;   #锁定表后，日志滚动一下
+mysql> show master status;  #查看一下二进制文件的信息，把信息保存下来，主要用于还原时知道二进制文件执行到那一刻
+#或者这个终端不要关闭，再打开一个使用以下命令
+mysql -uroot -hlocalhost -p -e 'show master status\G' > /backup/master-`date +%F`.info
+#保存完二进制文件信息后创建快照卷
+lvcreate -L 50M -s -p r -n mydata-snap /dev/myvg/mydata  #创建/dev/myvg/mydata的快照卷名为mydata-snap，只读，大小为50m
+#创建完快照后就可以把表锁给释放了
+mysql> unlock tables;
+#开始利用快照进行备份
+mount /dev/myvg/mydata-snap /mnt -o ro
+cd /mnt/data
+mkdir -pv /backup/full-backup
+cp -a ./* /backup/full_backup
+unmount /mnt
+lvremove --force /dev/myvg/mydata-snap
+cd /dev/myvg/mydata-snap
+rm mysql-bin.* -f   #删除二进制日志文件
+#至此已经完成全部备份
+mysqlbinlog --start-datetime='2016-10-08 13:48:34' mysql-bin000002 mysql-bin000004 ... > /backup/incremental.sql   #如果备份以后有多个二进制日志文件就只可以用时间来指定完全备份后的差异备份，把以后的文件全部写上，中间以空格隔开
+#开始还原
+cp -a /backup/full_backup/* /mydata/data  #利用-a可以把文件所有的属性都包含进来
+mysql> set sql_log_bin=0;   #关掉二进制日志
+mysql> source /backup/incremental.sql
+
+
+不管使用mysqldump还是快照备份，二进制日志相关的几个选项：
+innodb_support_xa={TRUE|FALSE}：分布式事物是否启用，在备份进优其是InnoDB引擎时要启用，默认情况下是启用的
+sync_binlog：在执行相关操作时，要把此项设定为1
+
+
+基于lvm自动化的备份工具：mylvmbackup(这是一个perl脚本)。
+lvm使用的是几乎热备，而不是热备
+
+
+
+percona提供的xtrabackup进行数据库备份
+
+xtrabackup
+ xtradb：这是一个存储引擎，相当于innodb的增强版，如果想用这个存储引擎，从percona官网上把原码下载下来，然后删除innodb源码并把其更名为innodb，就可以自动启用xtradb引擎。官方名称Percona XtraDB Cluster
+ innodb：
+
+
+#下载通用安装包
+wget https://www.percona.com/downloads/XtraBackup/Percona-XtraBackup-2.4.4/binary/tarball/percona-xtrabackup-2.4.4-Linux-x86_64.tar.gz
+tar -xvf percona-xtrabackup-2.4.4-Linux-x86_64.tar.gz
+mv percona-xtrabackup-2.4.4-Linux-x86_64 /usr/local/
+cd /usr/local/
+ln -sv percona-xtrabackup-2.4.4-Linux-x86_64 xtrabackup
+cd xtrabackup
+#可以创建一个专门用于备份的用用户，可基于以下命令进行创建
+mysql> create user 'bkpuser'@'localhost' identified by 'bkpuser';
+mysql> revoke all privileges, grant option from 'bkpuser';
+mysql> grant reload, lock tables, replication client on *.* to 'bkpuser'@'localhost';
+mysql> flush privileges;
+#备份
+bin/innobackupex --user=root --password=123456 /root/   #会在/root目录下创建一个以当前时间为准的目录
+	backup-my.cnf：备份的配置文件
+	xtrabackup_binlog_info：二进制日志文件的信息
+	xtrabackup_checkpoints：备份的信息，可以根据这个文件进行下一次的增量备份
+	xtrabackup_binlog_pos_innodb：二进制日志文件及用于InnoDB或XtraDB表的二进制日志文件的当前postion
+	xtrabackup_binary：备份中用到的xtrabackup的可执行文件
+#一般情况下，在用xtrabackup备份完成后，数据尚且不能用于恢复操作，因为备份的数据中可能会含未提交的事物或已经提交但尚未同步至数据文件中的事物。因此，此时数据文件仍处于不一致状态。需要作一些准备工作，“准备”的主要作用正是通过回滚未提交的事务及同步已经提交的事务至数据文件处于一致性状态。
+bin/innobackupex --apply-log /root/2016-10-08_17-39-56/  #准备工作
+#还原
+#登录到mysql上滚动一下日志，做一下差异备份
+bin/innobackupex --copy-back --datadir=/mydata/data /root/2016-10-08_22-07-45  #完全还原，/mydata/data必须是空的
+cd /mydata/data/
+chown -R mysql.mysql ./*  #把属主属组改为mysql
+bin/innobackupex --user=root --password=123456 /root/  #一般还原以后需要再做一次完全备份，用下一次的增量备份
+#还原如果在完全备份之后数据库有更改操作还要借助于二进制日志文件来还原
+xtrabackup+二进制日志：用这个方案用于备份还原
+
+#用xtrabackup来进行完全备份，差异备份
+bin/innobackupex --user=root --password=123456 /root/  #一般还原以后需要再做一次完全备份，用下一次的增量备份
+bin/innobackupex --user=root --password=123456 --incremental /root/inbak --incremental_basedir=/root/2016-10-08_22-42-48  #以/root/2016-10-08_22-42-48这个时刻为基准在/root/inbak下做差异备份
+bin/innobackupex --user=root --password=123456 --incremental /root/inbak --incremental_basedir=/root/inbak/2016-10-08_22-48-43  #当第二次做增量备份时--incremental_basedir指的是上次增量备份的路径
+#使用innobackupex的完全加增量备份来还原
+bin/innobackupex --apply-log --redo-only /root/2016-10-08_22-42-48/  #完全备份的准备工作，如果有增量备份需要指定--redo-only，因为可能在完全备份以后，会提交事物，这些操作会在增量备份里
+bin/innobackupex --apply-log --redo-only /root/2016-10-08_22-42-48/ --incremental-dir=/root/inbak/2016-10-08_22-51-10  #第一个增量备份的准备工作
+bin/innobackupex --apply-log --redo-only /root/2016-10-08_22-42-48/ --incremental-dir=/root/inbak/2016-10-08_22-52-41  #第二个增量备份的准备工作
+bin/innobackupex --copy-back --datadir=/mydata/data /root/2016-10-08_22-42-48/
+cd /mydata/data/
+chown -R mysql.mysql ./*  #把属主属组改为mysql
+
+
+导入或导出单张表
+默认情况下，InnoDB表不能通过直接复制表文件的方式在mysql服务器之间进行移植，即使使用了innodb_file_per_table选项。而使用xtrabackup工具可以实现此种功能，不过，此时需要"导出"表的mysql服务器启用了innodb_file_per_table选项(严格来说，是要"导出"的表在其创建之前，mysql服务器就启用了innodb_file_per_table选项)，并且"导入"表的服务器同时启用了innodb_file_per_table和innodb_expand_import选项。
+
+1、"导出"表
+导出表是在备份的prepare阶段进行的，因此，一但完全备份完成，就可以在prepare过程中通过--export选项将某表导出了
+innobackupex --apply-log --export /path/to/backup
+此命令会为每一个innodb表的表空间创建一个以.exp结尾的文件，这些以.exp结尾的文件则可以用于导入至其他服务器。
+
+2、"导入"表
+要在mysql服务器上导入来自于其他服务器的某innodb表，需要先在当前服务器上创建一个跟原表结构一致的表，而后和能实现表导入；
+mysql> create table mytable (...) engine=InnoDB;
+
+然后将此表的表空间删除：
+mysql> alert table mydatabase.mytable discard tablespace;
+
+然后，将来自于"导出"表的服务器的mytable表的mytable.ibd和mytable.exp文件复制到当前服务器的数据目录，然后使用如下命令将其"导入":
+mysql> alert table mydatabase.mytable import tablespace;
+
+
+安装percona
+yum install http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm
+yum install Percona-Server-server-57
+yum install percona-xtrabackup-24 #安装备份工具
+或者下载
+wget https://www.percona.com/downloads/Percona-Server-5.7/Percona-Server-5.7.10-3/binary/redhat/7/x86_64/Percona-Server-5.7.10-3-r63dafaf-el7-x86_64-bundle.tar
+tar -xvf Percona-Server-5.7.10-3-r63dafaf-el7-x86_64-bundle.tar
+rpm -ivh Percona-Server-server-57-5.7.10-3.1.el7.x86_64.rpm Percona-Server-client-57-5.7.10-3.1.el7.x86_64.rpm Percona-Server-shared-57-5.7.10-3.1.el7.x86_64.rpm
+或者
+rpm -ivh *.rpm
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+35_04
+
+00:30:00

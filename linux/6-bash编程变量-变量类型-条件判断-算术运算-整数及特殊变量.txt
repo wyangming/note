@@ -1,0 +1,363 @@
+﻿bash编程变量-变量类型-条件判断-算术运算-整数及特殊变量
+
+shell提供了编程功能，脚本编程
+
+shell是弱类型编程语言
+	强类型：变量在使用前，必须事先声明，甚至还需要初始化
+	弱类型：变量用时声明即可，拿来直接用，甚至不区分类型，一般默认为字符串
+
+变量赋值：VAR_NAME=VALUE
+
+bash变量类型：事先确定数据存储格式和长度
+	环境变量
+	本地变量(局部变量)
+	位置变量
+	特殊变量
+
+本地变量：
+	VAR_NAME=VALUE
+	局部变量则用关键词local
+		local VAR_NAME=VALUE	当前代码段
+			表示变量是局部的，作用域是为整个脚本或者bash进程
+	环境变量：作用域当前shell进程及其子进程
+		export VAR_NAME=VALUE
+			"导出"
+		或者先定义VAR_NAME=VALUE然后export VAR_NAME
+	位置变量：是用来引用脚本的参数
+		变量符号：
+			$1：第一个位置变量
+			$2：第二个位置变量
+	特殊变量：
+		$?：上一个命令执行状态返回值
+			程序执行以后有两类返回值：
+				程序执行结果
+				程序执行状态返回代码(0-255)
+					0：正确执行
+					1-255：错误执行，1，2，127是系统预留有特殊意义
+	脚本在执行时会启动一个子shell进程：
+		命令行中启动的脚本会继承当前shell的环境变量
+		系统自动执行的脚本(非命令行启动)，就需要自我定义各环境变量
+	bash：变量是进程的变量，可以在bash shell中直接去声明变量如：
+		NAME=Jerry
+		echo "My name is $NAME"
+
+引用变量：${VAR_NAME},只要不引起变量名混淆的{}号在大多数情况下可以省略。如果内部有变量还想让变量值替换用""，不想替换则用''
+		ANIMAL=pig
+		echo "There are some ${ANIMAL}s"
+
+输出重定向有一个特殊们置
+	/dev/null：软件设备，bit bucket，即数据黑洞
+	如：id student &> /dev/null  找不到执行结果，被数据黑洞吞噬掉
+
+撤消变量：
+unset VAR_NAME
+
+查看当前shell中的变量可用set不带任何参数查看
+	set：(包括环境变量与本地变量)
+
+查看当前shell中的所有环境变量
+	printenv	或者
+	env		或者
+	export
+
+对于字符串类型的变量如果想要追加可以用以下方式
+	ANIMALS=pig
+	ANIMALS=$ANIMALS:goat
+	ANIMALS=$ANIMALS:sheep
+
+对shell来讲所有的变量默认是字符串，是不可以做算术运算的
+
+脚本：通常是命令的堆砌，按实际需要，结合命令流程控制机制实现的源程序
+
+shebang：每个bash的第一行内容必须是#!/bin/bash这句话告诉内核用bash程序来执行这个脚本，也就是说这是一个脚本
+	#！/bin/bash：shebang
+	#：脚本的注释信息
+
+bash中的条件判断表达式：
+	条件测试类型：
+		整数测试
+		字符测试
+		文件测试
+	条件测试表达式：
+		[ expression ]
+		[[ expression ]]：是bash中的关键字
+		test expression
+
+整数比较：
+	-eq：测试两个整数是否相等：比如 $A -eq $B
+		A=3
+		B=6
+		[ $A -eq $B ]：返回的状态值为1可用$?查看
+	-nq：不等值比较
+	-gt：测试一个数是否大于另一个数：大于 为 真，否则为假
+	-lt：测试一个数是否小于另一个数：小于 为 真，否则为假
+	-ge：大于或等于
+	-le：小于或等于
+
+命令间的逻辑关系：
+	逻辑与：&&
+		第一个条件为假时，第二个条件不用判断，最终结果已有
+		第一个条件为真，第二个条件必须判断
+		用法：
+			id user1 &> /dev/null && echo "Hello user1"  当用户user1存在的时候打印Hello user1
+	逻辑或：||
+	非：!
+		用法：
+			! id user6 || useradd user6 当用户user6不存在的时候添加user6
+
+变量名称
+	只能包含：字母、数字、下划线，并且不能以数字开头
+	不应该跟系统中已有的环境变量重名
+	最好做到见名知意
+
+例子：
+	如果用户存在，就显示用户已经存在：否则，就添加此用户：
+	id user1 && echo "user1 exists." || useradd user1
+
+	如果/etc/inittab文件的行数大于100，就显示好大的文件：
+	[ `wc -l /etc/inittab | cut -d' ' -f1` -gt 100 ] && echo "Large file."
+
+	如果用户不存在，就添加；否则，显示其已经存在：
+	! id user1 && useradd user1 || echo "user1 exists."
+
+	如果用户不存在，添加并且给密码；否则，显示其已经存在：
+	! id user1 && useradd user1 && echo "user1" | passwd --stdin user1 | "user1 exists"
+
+	! id user1 &> /dev/null	&& useradd user1 && echo "user1" | passwd --stdin user1	&> /dev/null ||	echo "user1 exists."
+	USERS=`wc -l /etc/passwd | cut -d: -f1`
+	echo "$USERS users."
+
+	如果用户是管理员打印出Admin不是管理员打印Common user
+	NAME=root
+	USERID=`id -u $NAME`
+	[ $USERID -eq 0 ] && echo "Admin" || echo "Common user."
+
+条件判断，控制结构
+
+在linux中0为真其他的都为假
+
+单分支的if语句判断：
+	if 判断条件; then
+		statement1
+		statement2
+		...
+	fi
+
+双分支的if语句判断：
+	if 判断条件; then
+		statement1
+		statement2
+		...
+	else
+		statement3
+		statement4
+		...
+	fi
+
+if [ `grep "^$USERNAME\>" /etc/passwd` -eq 0 ]; then
+fi
+以上if判断的是用里面语句结果状态返回值来判断
+
+如果then与if不与同一行可以把;省略
+
+例子：
+	判断用户是否存在
+	#!/bin/bash
+	NAME=user20
+	if id $NAME &> /dev/null;then
+	  echo "$NAME exists."
+	else
+	  echo "$NAME not exists."
+	fi
+	
+	判断用户是否存在，存在提示不存在添加
+	#!/bin/bash
+	NAME=user20
+	if id $NAME &> /dev/null;then
+	  echo "$NAME exists."
+	else
+	  useradd $NAME
+	  echo $NAME | passwd --stdin $NAME &> /dev/null
+	  echo "Add $NAME finished."
+	fi
+	
+	如果用户的UID为0那么显示为管理员，否则显示为普通用户
+	NAME=user16
+	USERID=`id -u $NAME`
+	if [ $USERID -eq 0 ]; then
+		echo "Admin"
+	else
+		echo "common user."
+	fi
+	
+	NAME=user16
+	if [ `id -u $NAME` eq 0 ]; then
+		echo "Admin."
+	else
+		echo "common user."
+	fi
+	
+	统计bash的用户人数
+	grep "\<bash$" /etc/passwd &> /dev/null
+	RETVAL=$?
+	if [ $RETVAL -eq 0 ]; then
+	  USERS=`grep "\<bash$" /etc/passwd | wc -l`
+	  echo "The shells of $USERS users is bash."
+	else
+	  echo "No such user."
+	fi
+	
+	统计bash的用户人数，并显示一个用户
+	grep "\<bash$" /etc/passwd &> /dev/null
+	RETVAL=$?
+	if [ $RETVAL -eq 0 ]; then
+	  AUSER=`grep "\<bash$" /etc/passwd | head -1 | cut -d: -f1`
+	  echo "$AUSER is one of such users."
+	else
+	  echo "No such user."
+	fi
+	
+	给定一个用户，判断其UID与GID是否一样，如果一样，就显示此用户为"good guy"；否则，就显示此用户为"bad guy"
+	USERNAME=user1
+	USERID=`id -u $USERNAME`
+	GROUPID=`id -g $USERNAME`
+	if [ $USERID -eq $GROUPID ]; then
+		echo "Good guy.";
+	else
+		echo "Bad guy.";
+	fi
+
+shell中进行算术运算
+	A=3
+	B=6
+
+	let 后加算术运算表达式
+		let C=$A+$B
+		echo $C 输出的结果为9
+	$[算术运算表达式]
+		C=$[$A+$B]
+	$((算术运算表达式))
+		C=$(($A+$B))
+	expr 算术运算表达式，表达式中各种操作数及运算符之间要有空格，而且要使用命令引用
+		C=`expr $A + $B`
+
+exit：可用于退出当前脚本，可用于定义执行状态结束。如果没有定义执行状态，则把上一条命令的执行结果状态做为整个脚本的执行状态返回
+	exit n：可以自定义退出状态n是从0-255之间的数
+
+文件夹测试
+	-e FILE：测试一个文件是否存在
+	-f FILE：测试文件是否是一个为普通文件
+	-d PATH：测试指定路径是否为一个目录
+	-r FILE：判定给定文件对当前用户是否具有读权限
+	-w FILE：判定给定文件对当前用户是否具有写权限
+	-x FILE：判定给定文件对当前用户是否具有执行权限
+	
+	用法：
+		[ -e /etc/inittab ] 判断/etc/inittab文件是否存在
+		[ -x /etc/rc.d/rc.sysinit ] 判断当前用户对/etc/rc.d/rc.sysinit文件是否具有执行权限
+
+圆整：丢弃小数点后的内容
+
+多分支的if语句
+if 判断条件1; then
+	statement1
+	...
+elif 判断条件2; then
+	statement2
+	...
+elif 判断条件n; then
+	statementn
+	...
+fi
+
+例子：
+	判断文件是否存在
+	FILE=/etc/inittab
+	if [ -e $FILE ]; then
+	  echo "OK"
+	else
+	  echo "No such file."
+	fi
+	
+	给定一个文件，如果是一个普通文件，变显示之；如果是一个目录，亦显示之；否则，此为无法识别之文件
+	FILE=/etc/rc.d/rc.sysinit
+	if [ ! -e $FILE ]; then
+	  echo "No such file."
+	  exit 6#定义退出状态码
+	fi
+	if [ -f $FILE ]; then
+	 echo "Common file."
+	elif [ -d $FILE ]; then
+	  echo "Directory."
+	else
+	  echo "Unknown."
+	fi
+	
+	exit:退出脚本
+	exit #
+	如果脚本没有明确定义退出状态码，那么，最后执行的一条命令的退出码即为脚本的退出状态码；
+
+测试脚本是否有语法错误：
+bash -x 脚本：相当于脚本的单步执行
+	例子：
+		bash -x filetest.sh
+
+bash -n 脚本：检测脚本的语法是否正确
+	例子：
+		bash -n filetest.sh
+
+exit：退出脚本
+exit #
+如果脚本没有明确定义退出状态码，那么，最后执行的一条命令的退出码即为脚本的退出状态码。
+
+bash变量的类型：
+	本地变量(局部变量)
+	环境变量
+	位置变量：
+		$1, $2...：表示引用第几个参数
+		shift：单独用shift可剔除第一个参数，shift n可以剔除前n个参数
+	特殊变量：
+		$?：上一条参数的退出状态码
+		$#：表示命令的参数的个数
+		$*：参数列表，可以把整个参数列出来
+		$@：也属于参数列表
+	用法：
+		if [ $# -lt l ]; then		：表示命令至少输入一个参数
+
+例子：
+	接受一个参数(文件路径)，判断：此参数如果是一个存在的文件，变显示"OK"；否则就显示"No such file."。如果用户没有输入参数给出提示
+	if [ $# -lt 1 ]; then
+	  echo "Usage: ./filetest3.sh ARG! [ARG2...]"
+	  exit 7
+	fi
+	if [ -e $1 ]; then
+	  echo "OK."
+	else
+	  echo "No such file."
+	fi
+	
+	shift用法，需要传三个参数以上才有效果
+	echo $1
+	shift
+	echo $1
+	shift
+	echo $1
+	
+	shift用法，需要传5个参数以上才有效果
+	echo $1
+	shift 2
+	echo $1
+	shift 2
+	echo $1
+	
+	给脚本传递两个参数(整数)，显示此两者之和，之乘积
+	if [ $# -lt 2 ]; then
+	  echo "Usage: cacl.sh ARG1 ARG2"
+	fi
+	echo "The sum is : $[$1+$2]."
+	echo "The prod is : $[$1*$2]."
+
+
+
+
+

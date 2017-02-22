@@ -1,0 +1,79 @@
+bash字符测试及for循环
+
+字符测试：
+	==：比较两个字符串是否一致，两边要加空格也可以用=比较
+	!=：测试是否不等，不等为真，等则为假
+	>：一个字符串是否大于另一个字符串
+	<：一个字符串是否小于另一个字符串
+	-n string：测试指定字符串是否为空,空则真，不空则假
+	-s string：测试指定字符串是否不为空，不空为真，空则为假
+
+例子：
+	输入用户名，如果用户名与组名一样打印一样，不一样打印不一样
+		#!/bin/bash
+		if ! id $1 &>/dev/null; then
+		  echo "No such user."
+		  exit 10
+		fi
+		if [ `id -n -u $1` == `id -n -g $1` ]; then
+		  echo "Yiyang"
+		else
+		  echo "Bu Yiyang"
+		fi
+	传递一个参数(单字符就行)给脚本，如参数为q,Q,quit或Quit,就退出脚本；否则，就显示用户的参数
+		#!/bin/bash
+		if [ $1 == 'q' ];then
+		  echo "Quiting..."
+		  exit 1
+		elif [ $1 == 'Q' ];then
+		  echo "Quiting..."
+		  exit 2
+		elif [ $1 == 'quit' ];then
+		  echo "Quiting..."
+		  exit 3
+		elif [ $1 == 'Quit' ];then
+		  echo "Quiting..."
+		  exit 4
+		else
+		  echo $10
+		fi
+	
+
+循环：进入条件，退出条件
+
+for循环
+while循环
+until循环
+
+for循环
+
+for 变量 in 列表; do
+	循环体
+done
+
+例如：
+	for I in 1 2 3 4 5 6 7 8 9 10; do
+		...
+	done
+遍历完成后退出
+
+如何生成列表：
+	{1..100}自动展开1到100的所有整数
+
+seq(数值序列) [超始数 [步进长度]] 结束数
+
+`seq [超始数 [步进长度]] 结束数`：可以在for中使用
+`ls /etc`：也可以在for中使用
+
+例子：
+	declare -i SUM=0 declare声明变量关键字，-i代表一个数值。-x表示这个变量是环境变量
+	1到100字字的和
+		#!/bin/bash
+		declare -i SUM=0
+		for I in {1..100};do
+		  let SUM=$[$SUM+$I]
+		done
+		echo "The sum is $SUM."
+	依次向/etc/passwd中的每个用户问好
+		LINES=`wc -l /etc/passwd | cut -d' ' -f1`
+		for I in `seq 1 $LINES`; do echo "Hello, `head -n $I /etc/passwd | tail -1 | cut -d: -f1`"; done

@@ -1,0 +1,221 @@
+FTP：File Transfer Protocol
+ 21/tcp：端口
+
+支持命令：
+ get(下载文件), mget(下载多个文件), put(上传文件), mput(上传多个文件), cd, ls
+
+文件共享服务：应用层
+
+RPC：Remote Procedure Call，远程过程调用
+NFS：Network File System 依赖于RPC协议
+Samba：CIFS/SMB，可以实现跨平台文件共享
+
+FTP：tcp，两个连接
+ 命令连接：控制连接：21/tcp
+ 数据连接：
+  主动模式：20/tcp
+  被动模式：商品随机
+ 数据传输模式：
+  二进制：
+  文本：
+
+互联网上数据有三种：
+ 结构化数据
+ 半结构化数据
+ 非结构化数据
+
+服务器端ftp程序
+ wu-ftpd：
+ vsftpd：Very Secure ftp Daemon
+ proftpd：
+ pureftpd：
+ Filezilla：
+ Serv-U：
+
+客户端ftp程序
+ CLI：
+  ftp
+  lftp
+ GUI：
+  gftpd
+  FlashFXP
+  Cuteftp
+  Filezilla
+
+
+vsftpd：
+ /etc/vsftpd：配置文件
+ /etc/init.d/vsftpd：服务脚本
+ /usr/sbin/vsftpd：主程序
+
+vsftpd支持虚拟用户
+基于PAM实现用户认证
+ /etc/pam.d/*
+ /lib64/security/*
+
+vsftpd不允许除root用户外对/var/ftp根目录有写权限，可有只可以建立一个目录才可以
+
+ftp：系统用户
+ 匿名用户 --> 系统用户  实际上他映射到的是ftp用户 他的用户名是anonymous密码是空
+ 系统用户 local_enable
+ 虚拟用户 --> 系统用户
+
+
+yum install vsftpd
+rpm -ql vsftpd
+setenforce 0
+vim /etc/selinux/config
+service  vsftpd start
+useradd hadoop
+echo "hadoop" | passwd --stdin hadoop
+mkdir /var/ftp/upload
+sefacl -m u:ftp:rwx /var/ftp/upload/  #创建一个上传目录，让ftp用户具有读写执行权限
+
+
+文件服务权限：文件系统权限*文件共享权限
+
+
+配置文件选项说明：
+anonymous_enable=YES  #是否允许匿名用户登录
+anon_upload_enable=YES  #是否允许匿名用户下载
+local_enable=YES  #是否允许系统用户
+write_enable=YES  #是否可以上传文件，定义的是系统用户
+anon_upload_enable=YES  #是否允许匿名用户上传文件，让pub目录让ftp用户有写权限或者创建一个目录让ftp有写权限
+anon_mkdir_write_enable=YES  #匿名用户是否可以创建目录
+anon_other_write_enable=YES  #匿名用户是否可以删除目录
+dirmessage_enable=YES  #在每个目录下创建一个.message文件，当用户进入的时候都会显示这个文件里的信息
+xferlog_enable=YES   #是否打开传送日志，要跟xferlog_file结合使用
+xferlog_file=/var/log/xferlog  #传输日志文件
+xferlog_std_format=YES  #是否使用标准日志格式
+chown_uploads=YES  #用户上传文件后是否把文件的属主改为其他用记，如果是匿名用户上传文件改后，上传的文件不可以修改删除
+chown_username=whoever  #改为那个用户
+idle_session_timeout=600
+data_connection_timeout=120
+ascii_upload_enable=YES
+ascii_download_enable=YES  #采用文本模式上传下载
+chroot_list_enable=YES
+chroot_list_file=/etc/vsftpd/chroot_list  #两个地块用可以锁定用户的家目录，创建/etc/vsftpd/chroot_list放入锁定家目录的用户名
+chroot_local_user=YES  #锁定所有用户在自己的家目录下
+listen=YES  #vsftp是否以独立守护进程运行，以瞬时守护进程运得只需要/etc/xinetd.d/提供一个启动脚本
+pam_service_name=vsftpd   #pam配置文件的名字
+userlist_enable=YES  #启用/etc/vsftpd/user_list配置，里面的所有用户都不可以登录ftp 在/etc/vsftpd/ftpusers /etc/vsftpd/user_list  /etc/pam.d/vsftpd
+userlist_deny=NO #仅允许/etc/vsftpd/user_list里的用户可以登录
+max_clients=#   #设置最大连接数
+max_per_ip=#    #设置单ip最大连接数
+
+
+
+安全通信方式：
+ ftps
+
+
+cd /etc/pki/CA
+touch index.txt
+echo 01 > serial
+(umask 077; openssl genrsa -out private/cakey.pem 2048)
+openssl req -new -x509 -key private/cakey.pem -out cacert.pem -days 3650   #输入相应的信息
+mkdir /etc/vsftpd/ssl
+cd /etc/vsftpd/ssl
+(umask 077;openssl genrsa -out vsftpd.key 2048;)
+openssl req -new -key vsftpd.key -out vsftpd.csr   #输入相应的信息
+vim /etc/pki/tls/openssl.cnf   #编辑以下内容
+dir             = /etc/pki/CA
+#退出
+openssl ca -in vsftpd.csr -out vsftpd.crt
+vim /etc/vsftpd/vsftpd.conf  #内容如下
+ssl_enable=YES
+ssl_sslv3=YES
+ssl_tlsv1=YES
+allow_anon_ssl=NO
+force_local_data_ssl=YES
+force_local_logins_ssl=YES
+rsa_cert_file=/etc/vsftpd/ssl/vsftpd.crt
+rsa_private_key_file=/etc/vsftpd/ssl/vsftpd.key
+
+配置之后可以使用falshfxp连接
+站点 -> 站点管理 -> 新建站点 -> 连接类型：FTP using Explict SSL (Auth SSL) -> 登录类型：普通
+
+
+虚拟用户：认证基于PAM(手动定义配置)
+ MySQL：VSFTPD，users：Name,Password  mysql要安装pam-mysql这个模块
+ /etc/vsftpd/vusers: --> db_load(db4-utils库提供的)  转换为二进制格式
+  USERNAME：奇数行为用户
+  PASSWORD：偶数行为密码
+
+
+配置基于mysql的虚拟用户(虚拟用户的匹配与匿名用户是一样的，如果标上匿名用户登录虚拟用户是可以登录的)
+yum -y install mysql-server mysql-devel
+yum -y groupinstall "Development Libraries" "Development Tools"  #安装编译包
+wget http://prdownloads.sourceforge.net/pam-mysql/pam_mysql-0.7RC1.tar.gz
+tar -vxf pam_mysql-0.7RC1.tar.gz
+cd pam_mysql-0.7RC1
+yum install pam-devel  #需要依赖这个库
+./configure --with-mysql=/usr --with-openssl 或 ./configure --with-mysql=/usr/local/mysql --with-openssl
+#第二个是通用二进制装的mysql
+make
+make install
+
+#创建数据库信息
+create database vsftpd;
+create table users(
+    -> id int auto_increment not null,
+    -> name char(20) binary not null,
+    -> password char(48) binary not null,
+    -> primary key(id)
+    -> );
+desc users;
+grant select on vsftpd.* to vsftpd@127.0.0.1 identified by 'vsftpd';
+flush privileges;
+insert into users (name,password) values ('tom',password('tom')), ('jerry',password('jerry'));
+#退出测试
+mysql -h127.0.0.1 -uvsftpd -pvsftpd
+
+#配置pam
+vim /etc/pam.d/vsftpd.mysql  #内容如下
+auth required /lib/security/pam_mysql.so user=vsftpd passwd=vsftpd host=127.0.0.1 db=vsftpd table=users usercolumn=name passwdcolumn=password crypt=2
+account required /lib/security/pam_mysql.so user=vsftpd passwd=vsftpd host=127.0.0.1 db=vsftpd table=users usercolumn=name passwdcolumn=password crypt=2
+
+#添加虚拟用户的映射用户
+useradd -s /sbin/nologin -d /var/ftproot vuser
+chmod go+rx /var/ftproot
+
+配置vsftp支持pam认证
+vim /etc/vsftpd/vsftpd.conf  #内容如下
+guest_enable=YES
+guest_username=vuser
+pam_service_name=vsftpd.mysql  #刚才pam与mysql的配置文件
+force_local_data_ssl=NO
+force_local_logins_ssl=NO
+#保存退出后重启服务
+
+#如果登录不上可查看pam日志
+tail /var/log/secure
+
+
+为每个用户创建独立的权限
+vim /etc/vsftpd/vsftpd.conf  #内容如下
+user_config_dir=/etc/vsftpd/vusers_dir
+#退出后建立目录
+mkdir /etc/vsftpd/vusers_dir
+cd /etc/vsftpd/vusers_dir
+#创建以每个用户名命名的文件例如
+vim tom  #内容如下
+anon_upload_enable=YES
+anon_mkdir_write_enable=YES
+local_root=/var/ftproot/tom   #可以让每个用户使用单独的目录，如果不指定所有用将都用同一个目录
+#这样每个用户的权限就不一样了
+#把tom的属主改为vuser权限改为711
+
+
+
+
+
+
+
+
+
+
+
+
+
+

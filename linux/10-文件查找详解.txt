@@ -1,0 +1,115 @@
+文件查找详解
+
+grep, egrep, fgrep：文本查找
+
+文件查找
+	
+locate：全系统查找文件的命令
+	非实时的，模糊匹配，查找是根据全系统数据库进行查找的：linux每天晚上会自动把文件信息保存起来。
+	用法：
+		locate passwd
+	updatedb 手动生成数据库，优势在于速度快
+
+find：
+	特点：
+		实时
+		精确
+		支持众多查找标准
+		通过遍历指定目录中的所有文件完成查找，速度慢
+
+find 查找路径 查找标准 查找到以后的处理动作
+	查找路径：默认为当前目录
+	查找标准：指定为目录下的所有文件
+	处理动作：默认为显示到屏目上
+
+匹配标准(查找标准)
+	-name 'FILENAME'：对文件名进行精确匹配
+		文件通配：
+			*：任意长度的任意字符
+			?
+			[]
+	-iname 'FILENAME'：文件名匹配不区分大小写
+	-regex PATTERN：基于正则表达式进行文件名匹配查找
+	
+	-user USERNAME：根据文件的属主进行查找
+	-group GROUPNAME：根据文件的属组查找
+	
+	-uid UID：根据UID查找
+	-gid GID：根据GID查找
+	
+	-nouser：查找没有属主的文件
+	-nogroup：查找没有属组的文件
+	
+	-type：根据文件类型来查找
+		f:普通文件
+		d:目录
+		c：字符设备
+		b：块设备
+		l：符号链接
+		p：管道设备
+		s：套节字设备
+		
+	-size：根据文件大小来查找
+		默认单位是字节，如果没有+|-表示精确的单位,+表示大于，-表示小于
+		[+|-]#k
+		[+|-]#M
+		[+|-]#G
+	-mtime：修改时间
+	-ctime：改变时间
+	-actime：访问时间
+		以上都可以跟上一个数字表示多少天
+			[+|-]#
+	-mmin：修改时间
+	-cmin：改变时间
+	-amin：访问时间
+		以上都可以跟上一个数字表示多少分钟
+		[+|-]#
+	-perm MODE：根据权限进行查找，表是精确权限查找，用8进制的权限表示
+		-MODE：只有文件权限完全包含此MODE的权限时才符合条件
+		/MODE：任意一位权限匹配即满足条件
+	运作：
+		-print：默认运作
+		-ls：类似ls -l的形式显示每一个文件的详细信息
+		-ok COMMAND {} \;：用命令处理查到后的文件信息；如果要引用文件名则用{}来引用。一定要用\;结束否则语法错误。
+		-exec COMMAND {} \;：用命令处理查到后的文件信息最后要加空格\;做为命令的结束；{}引用文件的文件名
+		注：-ok的每一步操作都需要用户确认，-exec不需要用户确认
+		
+	组合条件：
+		-a：与，默认组合条件
+		-o：或
+		-not：非
+	用法：
+		find /etc -name 'passwd*' 以passwd开头的文件
+		find /etc -name '*passwd' 以passwd结尾的文件
+		find /etc -user root 属主为root的文件
+		find /tmp -nouser 查找没有属主的文件
+		find /tmp -type d 查找是目录的文件
+		find /tmp -size 1M ls 显示文件大小的信息
+		find /etc -nouser -a -type d 查找etc下没有属主且目录为d的文件
+		find /etc -not -type d 查找etc下不是目录的文件
+		find ./ -not -user user1 -a -not -user user2 查找当前目录下属主即不是user1也不是user2的文件
+		find ./ not \( -user user1 -o -user user2 \) 查找当前目录下属主即不是user1也不是user2的文件
+		find ./ -perm -001 查找其他用户有执行权限的文件
+		find ./ -perm -006 -exec chmod o-w {} \;
+		find ./ -perm -020 -exec mv {} {}.new \; 把符合条件的文件重命名为原文件名加.new {}用于引用原文件名
+		find ./ -name "*.sh" -a -perm -111 -exec chmod o-x {} \;
+		find ./ -type d -ok chmod +x {} \;
+		find -size +1k 查询当前目录下大于1k的文件
+		find ./ -amin -5 当前目录下5分钟之内没有访问过的文件
+		find ./ -amin +5 当前目录下5分钟之前没有访问过的文件
+		find /tmp actime +7 /tmp目录下七天没有被访问过的文件
+		find /tmp actime +30 /tmp目录下一个月之内没有被访问过的文件
+		find ./ -perm -020 -exec mv {} {}.new \;
+
+xargs：从标准输入接收进来命令来执行
+
+find /etc -size +1M -exec echo {} >> /tmp/etc.largefiles \;
+也可以替换为以下方式
+find /etc -size +1M | xargs echo {} >> /tmp/etc.largefiles \;
+find /etc -size +1M | xargs echo >> /tmp/etc.largefiles \;
+
+
+
+
+
+

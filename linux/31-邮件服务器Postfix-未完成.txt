@@ -1,0 +1,894 @@
+Mail Server：
+
+SMTP：Simple Mail Tansfer Protocol 简单邮件传输协议，可实现传输路由功能
+ESMTP：Extended Simple Mail Transfer Protocol
+
+POP3：Post Office Protocol 第三版
+IMAP4：Internet Mail Access Protocol 4 互联网邮件访问协议第四版
+
+UUCP：Unix to Unix CoPy
+ Unix主机复制文件的协议
+
+
+SMTP：是服c/s架构，服务端smtpd 客户端smtp(sendmail)，监听tcp协议的25号端口
+
+
+MT：邮件传输
+MD：邮件投递
+MU：邮件用户
+
+
+MUA：Mail User Agent  邮件用户代理
+ 软件：
+  Outlook Express, Outlook：只在Windows上可装
+  Foxmail：被腾讯公司收购
+  Thunderbird
+  Evolution
+  mutt：基于广西界面
+LMTP：本地邮件传输协议
+MTA：Mail Transfer Agent  邮件传输代理
+ 软件：
+  sendmail(用的是UUCP协议，使用的是单体结构，有些程序用到SUID，配置文件用的是m4编写)
+  qmail(发送邮件的效率可达到sendmail的20倍)
+  postfix：模块化设计，安全，跟sendmail的兼容性很好，效率高大致相当于sendmail的4倍
+  exim：英国剑桥大学(xen也是剑桥大学的)
+  Exchange(Windows，异步消息协作平台)
+MDA：Mail Delivery Agent  邮件投递代理
+ 软件：
+  procmail：与sendmail结合
+  maildrop：非常专业的邮件投递代理程序
+  postfix：自带投递代理程序
+MRA：Mail Retrieval Agent 邮件取回代理 是pop3与imap4协议的实现
+ 软件：
+  cyrus-imap
+  dovecot
+
+
+SASL：Simple Authintication Secure Layer，简单认证安全层 用的最多的是v2的版本
+ 软件：
+  cyrus-sasl
+  courier-authlib
+
+WebMail：邮箱服务程序
+ 软件：
+  openwebmail：可以与sendmail结合起来(台湾人研发的)
+  squirrelmail
+  Extmail(Extman)：国内的，有一个专门定制的Centos叫EMOS
+
+LDAP：Lightweight Directory Access Protocol，轻量级目录访问协议
+LDAP读的速非常快，但是写的时候非常慢
+
+虚拟用户：仅用于访问某服务的数字标识；
+ 用户：字符串，凭证
+
+smtps
+pop3s
+imaps
+明文传输：smtp --> smtps
+
+
+
+pop3：110/tcp端口
+stmp：25/tcp端口
+imap4：143/tcp端口
+以上全部以明文方式工作
+
+
+dovecot支持四种协议：pop3, imap4, pops, imaps
+dovecot自带SASL认证能力，支持两种邮箱格式mbox与maildir
+
+
+
+邮箱格式
+mbox：一个文件存储所有邮件
+maildir：一个文件存储一封邮件，所有邮件存储在一个目录中
+
+
+
+
+Postfix + SASL, (courier_authlib) + MySQL
+Dovecot + MySQL
+Extmail + Extman + httpd
+
+
+安装Postfix
+service named stop
+chkconfig named off
+rpm -e Postfix --nodeps  #Centos6.5上已经默认安装的是Postfix，可以不用卸载
+wget ftp://ftp.cuhk.edu.hk/pub/packages/mail-server/postfix/official/postfix-3.1.2.tar.gz
+tar xf postfix-3.1.2.tar.gz
+cd postfix-3.1.2
+#安装前确保以下包安装
+#cyrus-sasl,cyrus-sasl-devel,cyrus-sasl-lib,cyrus-sasl-plain
+rpm -ql cyrus-sasl-devel #查看cyrus安装的文件
+groupadd -g 2525 postfix
+useradd -g postfix -u 2525 -s /sbin/nologin -M postfix
+groupadd -g 2526 postdrop
+useradd -g postdrop -u 2526 -s /sbin/nologin -M postdrop #centos6上这个组已经存在
+make makefiles 'CCARGS=-DHAS_MYSQL -I/usr/local/mysql/include -DUSE_SASL_AUTH -DUSE_CYRUS_SASL -I/usr/include/sasl  -DUSE_TLS ' 'AUXLIBS=-L/usr/local/mysql/lib -lmysqlclient -lz -lm -L/usr/lib64/sasl2 -lsasl2  -lssl -lcrypto'
+make
+make install
+
+进入交互命令后会出现以下选项
+tempdir: [/root/postfix-2.9.3] /tmp/postfix   #临时文件的生成目录
+其他的都使用默认值
+
+postfix start  #启动服务
+tail /var/log/maillog  #日志脚本
+
+
+
+postfix的配置文件
+ postfix模块化：
+  master: /etc/postfix/master.cf  用于控制启动的其他进程
+  mail：/etc/postfix/main.cf 邮件服务功能的配置文件
+   参数 = 值 ：参数必须写在行的绝对行首，以空白字符开头的午被认为是上一行的延续
+
+postfixconf：专门针对/etc/postfix/main.cf进行管理
+ -d：显示默认的配置
+ -n：显示已经修改了的配置
+ -m：支持的查找表类型
+ -A：显示支持那种sasl的客户端插件类型
+ -e PARMATER=VALUE：更改某参数配置信息，并保存至main.cf文件中
+
+
+
+
+为postfix提供SysV服务脚本/etc/rc.d/init.d/postfix，内容如下(#END 之前，如果安装目录不是默认的要修改相应的配置)：
+#!/bin/bash
+#
+# postfix      Postfix Mail Transfer Agent
+#
+# chkconfig: 2345 80 30
+# description: Postfix is a Mail Transport Agent, which is the program \
+#              that moves mail from one machine to another.
+# processname: master
+# pidfile: /var/spool/postfix/pid/master.pid
+# config: /etc/postfix/main.cf
+# config: /etc/postfix/master.cf
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+# Check that networking is up.
+[ $NETWORKING = "no" ] && exit 3
+
+[ -x /usr/sbin/postfix ] || exit 4
+[ -d /etc/postfix ] || exit 5
+[ -d /var/spool/postfix ] || exit 6
+
+RETVAL=0
+prog="postfix"
+
+start() {
+	# Start daemons.
+	echo -n $"Starting postfix: "
+        /usr/bin/newaliases >/dev/null 2>&1
+	/usr/sbin/postfix start 2>/dev/null 1>&2 && success || failure $"$prog start"
+	RETVAL=$?
+	[ $RETVAL -eq 0 ] && touch /var/lock/subsys/postfix
+        echo
+	return $RETVAL
+}
+
+stop() {
+  # Stop daemons.
+	echo -n $"Shutting down postfix: "
+	/usr/sbin/postfix stop 2>/dev/null 1>&2 && success || failure $"$prog stop"
+	RETVAL=$?
+	[ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/postfix
+	echo
+	return $RETVAL
+}
+
+reload() {
+	echo -n $"Reloading postfix: "
+	/usr/sbin/postfix reload 2>/dev/null 1>&2 && success || failure $"$prog reload"
+	RETVAL=$?
+	echo
+	return $RETVAL
+}
+
+abort() {
+	/usr/sbin/postfix abort 2>/dev/null 1>&2 && success || failure $"$prog abort"
+	return $?
+}
+
+flush() {
+	/usr/sbin/postfix flush 2>/dev/null 1>&2 && success || failure $"$prog flush"
+	return $?
+}
+
+check() {
+	/usr/sbin/postfix check 2>/dev/null 1>&2 && success || failure $"$prog check"
+	return $?
+}
+
+restart() {
+	stop
+	start
+}
+
+# See how we were called.
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  restart)
+	stop
+	start
+	;;
+  reload)
+	reload
+	;;
+  abort)
+	abort
+	;;
+  flush)
+	flush
+	;;
+  check)
+	check
+	;;
+  status)
+  	status master
+	;;
+  condrestart)
+	[ -f /var/lock/subsys/postfix ] && restart || :
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|restart|reload|abort|flush|check|status|condrestart}"
+	exit 1
+esac
+
+exit $?
+
+# END
+
+#为此脚本赋予执行权限：
+chmod +x /etc/rc.d/init.d/postfix
+#将postfix服务添加至服务列表：
+chkconfig --add postfix
+#设置其开机自动启动：
+chkconfig postfix on
+#使用此脚本重新启动服务，以测试其能否正常执行：
+service postfix restart
+
+smtp状态码
+1xx：纯信息
+2xx：正确
+3xx：上一步操作尚未完成，需要补充
+4xx：暂时性错误
+5xx：永久性错误
+
+smtp协议命令：
+helo (smtp协议)
+ehlo (esmtp协议)
+mail from: (发件人)
+rcpt to: (收件人)
+data (数据)
+Subject: (标题)
+. (结束邮件发送)
+quit(退出)
+
+alias：邮件别名
+如果发给abc@f273c.com都转给postmaster@f274c.com，postfix依赖一个别名来识别
+/etc/aliases --> hash --> /etc/aliases.db
+需要用newaliases命令
+
+
+进行一些基本配置，测试启动postfix并进行发信
+vim /etc/postfix/main.cf
+#修改以下几项为您需要的配置
+myhostname = mail.f273c.com
+myorigin = f273c.com
+mydomain = f273c.com
+mydestination = $myhostname, localhost.$mydomain, localhost, $mydomain
+mynetworks = 192.168.1.0/24, 127.0.0.0/8
+
+说明:
+myorigin参数用来指明发件人所在的域名，即做发件地址伪装；
+mydestination参数指定postfix接收邮件时收件人的域名，即您的postfix系统要接收到哪个域名的邮件；
+myhostname 参数指定运行postfix邮件系统的主机的主机名，默认情况下，其值被设定为本地机器名；
+mydomain 参数指定您的域名，默认情况下，postfix将myhostname的第一部分删除而作为mydomain的值；
+mynetworks 参数指定你所在的网络的网络地址，postfix系统根据其值来区别用户是远程的还是本地的，如果是本地网络用户则允许其访问；
+inet_interfaces 参数指定postfix系统监听的网络接口；
+
+注意：
+1、在postfix的配置文件中，参数行和注释行是不能处在同一行中的；
+2、任何一个参数的值都不需要加引号，否则，引号将会被当作参数值的一部分来使用；
+3、每修改参数及其值后执行 postfix reload 即可令其生效；但若修改了inet_interfaces，则需重新启动postfix；
+4、如果一个参数的值有多个，可以将它们放在不同的行中，只需要在其后的每个行前多置一个空格即可；postfix会把第一个字符为空格或tab的文本行视为上一行的延续；
+5、
+
+
+#邮件发送
+iptables -I INPUT -p tcp --dport 25 -j ACCEPT  #开放25端口
+newaliases
+ls /etc/ | grep alias  #查看/etc/aliases.db生成没有
+hostname mail.f273c.com
+vim /etc/sysconfig/network #修改内容如下
+HOSTNAME=mail.f273c.com
+rpm -qa | grep bind  #查看bind的安装信息，一般centos6上面只装了bind-utils没装bind
+yum install bind bind-utils
+vim /etc/named.rfc1912.zones #添加以下内容
+zone "f273c.com" IN {
+        type master;
+        file "f273c.com.zone";
+        allow-update { none; };
+        allow-transfer { none; };
+};
+
+zone "1.168.192.in-addr.arpa" IN {
+        type master;
+        file "192.168.1.zone";
+        allow-update { none; };
+        allow-transfer { none; };
+};
+#退出后建立以下文件
+cd /var/named/
+vim f273c.com.zone  #内容如下
+$TTL 600
+@               IN              SOA             ns.f273c.com.           admin.f273c.com. (
+                                                                        2015092601
+                                                                        2H
+                                                                        10M
+                                                                        3D
+                                                                        1D )
+                IN              NS              ns
+                IN              MX 10           mail
+ns              IN              A               192.168.1.149
+mail            IN              A               192.168.1.149
+www				IN				A				192.168.1.149
+
+vim 192.168.1.zone  #内容如下
+$TTL 600
+@               IN              SOA             ns.f273c.com.           admin.f273c.com. (
+                                                                        2015092601
+                                                                        2H
+                                                                        10M
+                                                                        3D
+                                                                        1D )
+                IN              NS              ns.f273c.com.
+1               IN              PTR             ns.f273c.com.
+1               IN              PTR             mail.f273c.com.
+1				IN				PTR				www.f273c.com.
+
+chgrp named f273c.com.zone 192.168.1.zone
+chmod 640 f273c.com.zone 192.168.1.zone
+named-checkzone "f273c.com" f273c.com. zone
+named-checkzone "1.168.192.in_addr.arpa" 192.168.1.zone
+service named start
+chkconfig named on
+dig -t MX f273c.com @192.168.1.149
+service named restart
+dig -t MX f273c.com @192.168.1.149
+dig -t A mail.f273c.com
+dig -t A mail.f273c.com @192.168.1.149
+dig -x 192.168.1.149 @192.168.1.149
+cd /etc/postfix
+vim main.cf  #找到以下内容进行修改
+mynetworks = 192.168.1.0/24, 127.0.0.0/8  #给整个网段进行中继
+myhostname = mail.f273c.com
+myorigin = $mydomain
+mydomain = f273c.com
+mydestination = $myhostname, $mydomain, localhost, ns.$mydomain
+#退出后重启
+service postfix configtest  #测试
+service postfix restart
+tail /var/log/maillog  #查看日志
+vim /etc/resolv.conf #修改以下内容为
+nameserver 192.168.1.149
+telnet mail.f273c.com 25
+#进入交互命令后会出现以下选项
+helo mail.f273c.com
+mail from:abc@abc.com
+rcpt to:root
+data
+Subject:this is test title  #标题
+this is test content  #内容
+.
+quit
+tail /var/log/maillog  #如果status=sent则说明发送成功
+mail  #可以接收所发送的邮件
+
+#不中继其他人的邮件
+vim /etc/postfix/main.cf #修改以下内容
+mynetworks = 127.0.0.0/8
+service postfix restart
+#找另外一个机子用telnet命令链接上去测试,需要修改host文件把mail.f273c.com改为192.168.1.149
+telnet mail.f273c.com 25
+helo mail.f273c.com
+mail from:abc@abc.com
+rcpt to:root@b.net   #这一步会报中继错误
+
+#如果在本机上这样测试就可以中继
+telnet 127.0.0.1 25
+helo localhost
+mail from:a@f273c.com
+rcpt to:a@b.net   #这样是可以中继的
+quit
+
+#再把/etc/postfix/main.cf的内容修改回来
+vim /etc/postfix/main.cf  #修改的内容
+mynetworks = 192.168.1.0/24, 127.0.0.0/8
+service postfix restart
+
+#在其他主机上测试的话，服务器上的用户不可以是root必须是普通用户且必须有密码
+
+
+
+
+安装dovecot客户端(dovecot用yum安装时会装一个mysql的客户端，之前机子上装的mysql是编译安装的，安装在一个特殊位置，dovecot客户端安装的mysql客户端没有影响)
+yum install dovecot
+#配置文件在/etc/dovecot/dovecot.conf
+vim /etc/dovecot/dovecot.conf  #编辑以下内容
+protocols = imap pop3  #找到protocols只留下这两个
+service dovecot start
+iptables -I INPUT -p tcp --dport 110 -j ACCEPT  #开放110端口
+#发送邮件后可用110端口来收邮件
+telnet mail.f273c.com 110
+USER root  #登录的用户名
+PASS ****  #登录的密码
+LIST  #查看邮件
+RETR 1  #取出来第一封邮件
+RETR 2
+quit  #退出
+
+
+
+postfix + SASL 实现用户认证
+1、启用sasl，启动sasl服务：服务脚本在/etc/init.d/saslauthd  配置文件在/etc/sysconfig/saslauthd
+saslauthd -v  #显示服务器支持那些种认证机制即认证模块，一般默认为pam
+vim /etc/sysconfig/saslauthd #把MECH修改为以下内容
+MECH=shadow  #shadow表示到etc下的shadow跟passwd中找认证机制
+
+useradd openstack
+passwd openstack  #新建用户，用于测试saslauthd服务
+
+service saslauthd status
+service saslauthd start  #启动 有时候如果不行就再使用service saslauthd restart试试
+testsaslauthd -h  #这个命令可以测试saslauthd
+testsaslauthd -u openstack -p openstack  #提示0: OK "Success."说明成功
+postconf -a  #查看服务器端是否支持sasl的认证，出现cyrus说明支持
+
+
+
+
+
+
+
+实现postfix基于客户端的访问控制
+
+1、基于客户端的访问控制概览
+
+postfix内置了多种反垃圾邮件的机制，其中就包括“客户端”发送邮件限制。客户端判别机制可以设定一系列客户信息的判别条件：
+smtpd_client_restrictions  #限定那些可以链接服务器
+smtpd_data_restrictions  #只有谁可以发送data指令
+smtpd_helo_restrictions   #用于限定只有什么样的用户才可以发送helo指令
+smtpd_recipient_restrictions  #限定谁可以发送rcpt to:指令
+smtpd_sender_restrictions   #限定谁可以发送mail from:指令
+
+上面的每一项参数分别用于检查SMTP会话过程中的特定阶段，即客户端提供相应信息的阶段，如当客户端发起连接请求时，postfix就可以根据配置文件中定义的smtpd_client_restrictions参数来判别此客户端IP的访问权限。相应地，smtpd_helo_restrictions则用于根据用户的helo信息判别客户端的访问能力等等。
+
+如果DATA命令之前的所有内容都被接受，客户端接着就可以开始传送邮件内容了。邮件内容通常由两部分组成，前半部分是标题(header)，其可以由header_check过滤，后半部分是邮件正文(body)，其可以由check_body过滤。这两项实现的是邮件“内容检查”。
+
+postfix的默认配置如下：
+smtpd_client_restrictions =
+smtpd_data_restrictions =
+smtpd_end_of_data_restrictions =
+smtpd_etrn_restrictions =
+smtpd_helo_restrictions =
+smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination
+smtpd_sender_restrictions =
+
+这限制了只有mynetworks参数中定义的本地网络中的客户端才能通过postfix转发邮件，其它客户端则不被允许，从而关闭了开放式中继(open relay)的功能。
+
+Postfix有多个内置的限制条件，如上面的permit_mynetworks和reject_unauth_destination，但管理员也可以使用访问表(access map)来自定义限制条件。自定义访问表的条件通常使用check_client_access, check_helo_access, check_sender_access, check_recipient_access进行，它们后面通常跟上type:mapname格式的访问表类型和名称。其中，check_sender_access和check_recipient_access用来检查客户端提供的邮件地址，因此，其访问表中可以使用完整的邮件地址，如admin@f273c.com；也可以只使用域名，如f273c.com；还可以只有用户名的部分，如marion@。
+
+查找表
+ /etc/postfix/access --> hash格式 --> /etc/postfix/access.db
+  obama@aol.com reject
+  microsoft.com OK
+可以直接在以下直接设置
+smtpd_client_restrictions = check_client_access hash:/etc/postfix/access
+smtpd_sender_restrictions = check_helo_access mysql:/etc/postfix/mysql_user  #到数据库配置文件里查找可以发送的信息，配置文件里一定要写清楚相应数据库信息
+
+
+2、实现示例1
+
+这里以禁止192.168.1.150这台主机通过工作在1922.168.1.149上的postfix服务发送邮件为例演示说明其实现过程。访问表使用hash的格式。
+
+(1)首先，编辑/etc/postfix/access文件，以之做为客户端检查的控制文件，在里面定义如下一行：
+192.168.1.150		REJECT    #不让这个地址发邮件
+whitehouse.com		REJECT    #拒绝这个地址的来源发邮件
+
+(2)将此文件转换为hash格式
+postmap /etc/postfix/access
+
+(3)配置postfix使用此文件对客户端进行检查
+编辑/etc/postfix/main.cf文件，添加如下参数：
+smtpd_client_restrictions = check_client_access hash:/etc/postfix/access
+smtpd_sender_restrictions = check_sender_access hash:/etc/postfix/access
+
+(4)让postfix重新载入配置文件即可进行发信控制的效果测试了。
+service postfix restart  #限可测试
+
+
+3、实现示例2
+
+这里以禁止通过本服务器向microsoft.com域发送邮件为例演示其实现过程。访问表使用hash的格式。
+(1)首先，建立/etc/postfix/denydstdomains文件(文件名任取)，在里面定义如下一行：
+microsoft.com		REJECT
+
+(2)将此文件转换为hash格式
+# postmap /etc/postfix/denydstdomains
+
+(3)配置postfix使用此文件对客户端进行检查
+编辑/etc/postfix/main.cf文件，添加如下参数：
+smtpd_recipient_restrictions = check_recipient_access hash:/etc/postfix/denydstdomains, permit_mynetworks, reject_unauth_destination
+
+(4)让postfix重新载入配置文件即可进行发信控制的效果测试了。
+
+4、检查表格式的说明
+
+hash类的检查表都使用类似如下的格式：
+pattern   action
+
+检查表文件中，空白行、仅包含空白字符的行和以#开头的行都会被忽略。以空白字符开头后跟其它非空白字符的行会被认为是前一行的延续，是一行的组成部分。
+
+(1)关于pattern
+其pattern通常有两类地址：邮件地址和主机名称/地址。
+
+邮件地址的pattern格式如下：
+user@domain  用于匹配指定邮件地址；
+domain.tld   用于匹配以此域名作为邮件地址中的域名部分的所有邮件地址；
+user@ 			 用于匹配以此作为邮件地址中的用户名部分的所有邮件地址；
+
+主机名称/地址的pattern格式如下：
+domain.tld   用于匹配指定域及其子域内的所有主机；
+.domain.tld   用于匹配指定域的子域内的所有主机；
+net.work.addr.ess
+net.work.addr
+net.work
+net        用于匹配特定的IP地址或网络内的所有主机；
+network/mask  CIDR格式，匹配指定网络内的所有主机；
+
+(2)关于action
+
+接受类的动作：
+OK   接受其pattern匹配的邮件地址或主机名称/地址；
+全部由数字组成的action   隐式表示OK；
+
+拒绝类的动作(部分)：
+4NN text 
+5NN text 
+    其中4NN类表示过一会儿重试；5NN类表示严重错误，将停止重试邮件发送；421和521对于postfix来说有特殊意义，尽量不要自定义这两个代码；
+REJECT optional text...   拒绝；text为可选信息；
+DEFER optional text...    拒绝；text为可选信息； 
+
+
+限定向openstack发邮件
+vim /etc/postfix/recipient  #内容如下
+openstack@		REJECT
+postmap /etc/postfix/recipient
+vim /etc/postfix/main.cf
+smtpd_recipient_restrictions = check_recipient_access hash:/etc/postfix/recipient, permit_mynetworks, reject_unauth_destination   #permit_mynetworks与reject_unauth_destination是必须的check_recipient_access hash:/etc/postfix/recipient必须写在前面reject_unauth_destination必须写在最后
+保存退出，重启即可
+
+
+
+
+
+
+别名
+vim /etc/aliases  #添加以下内容
+a:		openstack
+tomcat:	openstack
+#保存退出，发给a与tomcat两个用户的邮件全部转给openstack，结果是发给tomcat用户的邮件tomcat收不到
+newaliases
+service postfix restart
+
+
+
+
+
+
+#为postfix开启基于cyrus-sasl的认证功能
+vim /etc/postfix/main.cf
+添加以下内容：
+############################CYRUS-SASL############################
+broken_sasl_auth_clients = yes
+smtpd_recipient_restrictions=permit_mynetworks,permit_sasl_authenticated,reject_invalid_hostname,reject_non_fqdn_hostname,reject_unknown_sender_domain,reject_non_fqdn_sender,reject_non_fqdn_recipient,reject_unknown_recipient_domain,reject_unauth_pipelining,reject_unauth_destination    #其实只这permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination这三项即可
+smtpd_sasl_auth_enable = yes
+smtpd_sasl_local_domain = $myhostname
+smtpd_sasl_security_options = noanonymous   #不支持匿名用户
+#smtpd_sasl_application_name = smtpd #这项已经过时
+smtpd_sasl_path = smtpd  #代替smtpd_sasl_application_name
+smtpd_banner = Welcome to our $myhostname ESMTP,Warning: Version not Available!
+
+
+vim /usr/lib64/sasl2/smtpd.conf
+#让smtpd服务以那种方式实现认证，添加如下内容：
+log_level: 3  #日志级别，一般不用
+pwcheck_method: saslauthd   #基于saslauthd完成用户
+mech_list: PLAIN LOGIN   #认证功能
+
+vim /etc/postfix/main.cf
+mynetworks = 127.0.0.0/8
+
+service postfix restart
+
+让postfix重新加载配置文件
+/usr/sbin/postfix reload
+
+telnet 192.168.1.149
+ehlo mail.f273c.com  #出现250-AUTH PLAIN LOGIN与250-AUTH=PLAIN LOGIN说明认证成功
+mail from:root@f273c.com
+rcpt to:hello@aol.com  #这个是可以中继的
+
+
+echo -n "openstack" | openssl base64  #把结果复制下来，用openstack登录。echo会打印换行符，-n不会打印换行符
+telnet mail.f273c.com 25
+ehlo mail.f273c.com
+auth login  #认证登录
+b3BlbnN0YWNr  #这个是用户名
+b3BlbnN0YWNr  #因为用户名跟密码是一样的，提示Authentication successful说明成功
+mail from:openstack@f273c.com
+rcpt to:root@f273c.com
+data
+Subject:this is test title sasl2
+this is test tile sasl2 con
+.
+quit
+
+
+当我们安装一个程序，当这个程序被某一个编译安装的包依赖需要时，一定要安装devel包。但是编译安装的程序一般不需的，他是完事的安装。因为编译安装需要找依赖程序的开发库跟头文件。
+头文件是以.h结尾的文件，库文件是以.so结尾的文件
+
+
+/etc/postfix/main.cf其他的定义
+#home_mailbox = Mailbox   #邮箱格式以文件定义
+#home_mailbox = Maildir/  #邮箱格式以目录定义
+#mail_spool_directory = /var/mail          #邮箱存放的目录
+#mail_spool_directory = /var/spool/mail    #邮箱存放的目录
+#mailbox_command = /some/where/procmail                       #邮件投递代理程序
+#mailbox_command = /some/where/procmail -a "$EXTENSION"       #邮件投递代理程序
+
+
+物理服务器：
+ 一台服务器为多个域收发邮件
+  要使用多个域收发邮件，需要把postfix的配置文件注释以下选项
+   mydestination
+   mydomain
+   myorigin
+
+虚拟域：
+用户别名：
+用户账号：虚拟用户
+
+
+courier-authlib安装
+wget http://nchc.dl.sourceforge.net/project/courier/authlib/0.66.4/courier-authlib-0.66.4.tar.bz2
+tar jxvf courier-authlib-0.66.4.tar.bz2
+courier-authlib-0.66.4
+yum list all | grep ltdl  #查看依赖库libtool-ltdl与libtool-ltdl-devel是否装上，如果没装上用yum install libtool-ltdl libtool-ltdl-devel来安装
+yum install expect  #完成主机之间的通信
+./configure \
+    --prefix=/usr/local/courier-authlib \
+    --sysconfdir=/etc \  #配置文件安装目录
+    --without-authpam \
+    --without-authshadow \
+    --without-authvchkpw \
+    --without-authpgsql \
+    --with-authmysql \
+    --with-mysql-libs=/usr/local/mysql/lib \   #如果手动安装Mysql要改路径
+    --with-mysql-includes=/usr/local/mysql/include \   #如果手动安装Mysql要改路径
+    --with-redhat \
+    --with-authmysqlrc=/etc/authmysqlrc \   #courier-authlib提供的mysql配置文件
+    --with-authdaemonrc=/etc/authdaemonrc \  #服务的配置文件
+    --with-mailuser=postfix \   #实现postfix收发管理的用户
+    --with-mailgroup=postfix \  #实现postfix收发管理的组
+    --with-ltdl-lib=/usr/lib \  #ltdl库的路径，确实libtool-ltdl与libtool-ltdl-devel这两个库已经装上
+    --with-ltdl-include=/usr/include  #ltdl的头文件
+#如果报invalid ltdl library directory: '/usr/lib'或者invalid ltdl library directory: '/usr/lib64'错误则需要编译安装libtool
+wget http://mirrors.ustc.edu.cn/gnu/libtool/libtool-2.4.6.tar.gz
+tar zxvf libtool-2.4.6.tar.gz
+libtool-2.4.6
+./configure --prefix=/usr/local/libtool-2.4.6 --enable-ltdl-install
+make
+make install
+#下载安装courier-unicode
+wget http://nchc.dl.sourceforge.net/project/courier/courier-unicode/1.4/courier-unicode-1.4.tar.bz2
+tar -xvf courier-unicode-1.4.tar.bz2
+cd courier-unicode-1.4
+./configure
+make
+make install
+./configure --prefix=/usr/local/courier-authlib --sysconfdir=/etc --without-authpam --without-authshadow --without-authvchkpw --without-authpgsql --with-authmysql --with-mysql-libs=/usr/local/mysql/lib --with-mysql-includes=/usr/local/mysql/include --with-redhat --with-authmysqlrc=/etc/authmysqlrc --with-authdaemonrc=/etc/authdaemonrc --with-mailuser=postfix --with-mailgroup=postfix --with-ltdl-lib=/usr/local/libtool-2.4.6/lib --with-ltdl-include=/usr/local/libtool-2.4.6/include
+make
+make install
+#备注：可以使用--with-authdaemonvar=/var/spool/authdaemon选项来指定进程套按字目录路径。
+
+chmod 755 /usr/local/courier-authlib/var/spool/authdaemon
+cp /etc/authdaemonrc.dist  /etc/authdaemonrc
+cp /etc/authmysqlrc.dist  /etc/authmysqlrc
+#修改/etc/authdaemonrc 文件
+authmodulelist="authmysql"
+authmodulelistorig="authmysql"
+daemons=10
+#配置其通过mysql进行邮件帐号认证
+#编辑/etc/authmysqlrc 为以下内容，其中2525，2525 为postfix 用户的UID和GID。
+MYSQL_SERVER localhost
+MYSQL_PORT 3306                   (指定你的mysql监听的端口，这里使用默认的3306)
+MYSQL_USERNAME  extmail      (这时为后文要用的数据库的所有者的用户名)
+MYSQL_PASSWORD extmail        (密码)
+MYSQL_SOCKET  /var/lib/mysql/mysql.sock  #通用二进制格式安装的是在/tmp目录下，把mysql服务启动起来就可以看到
+MYSQL_DATABASE  extmail
+MYSQL_USER_TABLE  mailbox
+MYSQL_CRYPT_PWFIELD  password
+MYSQL_UID_FIELD  '2525'
+MYSQL_GID_FIELD  '2525'
+MYSQL_LOGIN_FIELD  username
+MYSQL_HOME_FIELD  concat('/var/mailbox/',homedir)
+MYSQL_NAME_FIELD  name
+MYSQL_MAILDIR_FIELD  concat('/var/mailbox/',maildir)
+#提供SysV服务脚本
+cp courier-authlib.sysvinit /etc/rc.d/init.d/courier-authlib
+chmod 755 /etc/init.d/courier-authlib
+chkconfig --add courier-authlib
+chkconfig --level 2345 courier-authlib on
+service courier-authlib start
+#输出库文件
+echo "/usr/local/courier-authlib/lib/courier-authlib" >> /etc/ld.so.conf.d/courier-authlib.conf
+ldconfig -v  #重新载入库文件
+service courier-authlib start   (启动服务)
+#配置postfix和courier-authlib
+#新建虚拟用户邮箱所在的目录，并将其权限赋予postfix用户：
+mkdir –pv /var/mailbox
+chown –R postfix /var/mailbox
+#接下来重新配置SMTP 认证，编辑 /usr/lib/sasl2/smtpd.conf ，确保其为以下内容：
+pwcheck_method: authdaemond  #原来是saslauthd，若装过courier-authlib后saslauthd这个服务就不用了
+log_level: 3
+mech_list:PLAIN LOGIN
+authdaemond_path:/usr/local/courier-authlib/var/spool/authdaemon/socket
+#退出重启
+service saslauthd restart
+#让postfix支持虚拟域和虚拟用户
+#编辑/etc/postfix/main.cf，添加如下内容：
+########################Virtual Mailbox Settings########################
+virtual_mailbox_base = /var/mailbox
+virtual_mailbox_maps = mysql:/etc/postfix/mysql_virtual_mailbox_maps.cf
+virtual_mailbox_domains = mysql:/etc/postfix/mysql_virtual_domains_maps.cf
+virtual_alias_domains =
+virtual_alias_maps = mysql:/etc/postfix/mysql_virtual_alias_maps.cf
+virtual_uid_maps = static:2525
+virtual_gid_maps = static:2525
+virtual_transport = virtual
+maildrop_destination_recipient_limit = 1
+maildrop_destination_concurrency_limit = 1
+##########################QUOTA Settings########################
+message_size_limit = 14336000
+virtual_mailbox_limit = 20971520
+virtual_create_maildirsize = yes
+virtual_mailbox_extended = yes
+virtual_mailbox_limit_maps = mysql:/etc/postfix/mysql_virtual_mailbox_limit_maps.cf
+virtual_mailbox_limit_override = yes
+virtual_maildir_limit_message = Sorry, the user's maildir has overdrawn his diskspace quota, please Tidy your mailbox and try again later.
+virtual_overquota_bounce = yes
+
+#使用extman源码目录下docs目录中的extmail.sql和init.sql建立数据库：
+tar zxvf  extman-1.1.tar.gz
+cd extman-1.1/docs
+sed -i 's@TYPE=MyISAM@ENGINE=InnoDB@g' extmail.sql  #把表类型换一下
+mysql -uroot -p123456 < extmail.sql
+mysql -u root -p <init.sql
+#因sql语句不多，在mysql5.7上有些不兼容得一点儿一点儿改，会花点儿时间
+cp mysql_virtual_* /etc/postfix/
+#启用虚拟域以后，需要取消中心域，即注释掉myhostname, mydestination, mydomain, myorigin几个指令；当然，你也可以把mydestionation的值改为你自己需要的。
+service postfix restart
+
+
+
+#配置dovecot
+vim /etc/dovecot.conf
+mail_location = maildir:/var/mailbox/%d/%n/Maildir
+……
+auth default {
+    mechanisms = plain
+    passdb sql {
+        args = /etc/dovecot-mysql.conf
+    }
+    userdb sql {
+        args = /etc/dovecot-mysql.conf
+    }
+    ……
+
+vim /etc/dovecot-mysql.conf                 
+driver = mysql
+connect = host=localhost dbname=extmail user=extmail password=extmail
+default_pass_scheme = CRYPT
+password_query = SELECT username AS user,password AS password FROM mailbox WHERE username = '%u' 
+user_query = SELECT maildir, uidnumber AS uid, gidnumber AS gid FROM mailbox WHERE username = '%u'
+
+#说明：如果mysql服务器是本地主机，即host=localhost时，如果mysql.sock文件不是默认的/var/lib/mysql/mysql.sock，可以使用host=“sock文件的路径”来指定新位置；例如，使用通用二进制格式安装的MySQL，其soc文件位置为/tmp/mysql.sock，相应地，connect应按如下方式定义。
+connect = host=/tmp/mysql.sock dbname=extmail user=extmail password=extmail
+
+接下来启动dovecot服务：
+service dovecot start
+chkconfig dovecot on
+
+-----------------------------telnet 127.0.0.1 25 没测试通---------------------------------
+vim /etc/dovecot/conf.d/10-mail.conf  #修改的内容如下
+mail_location = maildir:/var/mailbox/%d/%n/Maildir
+#!include auth-system.conf.ext
+!include auth-sql.conf.ext
+
+vim /etc/dovecot/conf.d/auth-sql.conf.ext #修改内容如下
+passdb {
+  driver = sql
+  args = /etc/dovecot/dovecot-mysql.conf.ext
+}
+userdb {
+  driver = sql
+  args = /etc/dovecot/dovecot-mysql.conf.ext
+}
+
+说明：如果mysql服务器是本地主机，即host=localhost时，如果mysql.sock文件不是默认的/var/lib/mysql/mysql.sock，可以使用host=“sock文件的路径”来指定新位置；例如，使用通用二进制格式安装的MySQL，其soc文件位置为/tmp/mysql.sock，相应地，connect应按如下方式定义。
+connect = host=/tmp/mysql.sock dbname=extmail user=extmail password=extmail
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+可参考《postfix权威指南》
+26_0
+00:50:00

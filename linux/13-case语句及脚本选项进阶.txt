@@ -1,0 +1,178 @@
+面向过程
+	控制结构
+		顺序结构
+		选择结构
+		循环结构
+
+选择结构：
+	if:单分支、双分支、多分支
+	if CONDITION; then
+		statement
+		...
+	fi
+	
+	if CONDITION; then
+		statement
+		...
+	else
+		statement
+		...
+	fi
+	
+	if CONDITION1; then
+		statement
+		...
+	elif CONDITION2; then
+		statement
+		...
+	else
+		statement
+		...
+	fi
+多分支的效率比较低，得一个一个比较
+
+case语句及脚本选项进阶
+
+case语句：选择结构，结构明晰
+
+case SWITCH in 
+value1)
+	statement
+	...
+	;;
+value2)
+	statement
+	...
+	;;
+*)
+	statement
+	...
+	;;
+esac
+
+SWITCH是引用变量的值
+value1)、value2)可以是表达式
+
+例子：
+给脚本一个字符判断是否是数字，小写字母，大写字母
+#!/bin/bash
+case $1 in
+[0-9])
+ echo "A digit." ;;
+[a-z])
+ echo "Lower" ;;
+[A-Z])
+ echo "Upper" ;;
+*)
+ echo "Special character." ;;
+esac
+只接受参数start,stop,restart,status其中之一
+#!/bin/bash
+case $1 in
+start)
+ echo "start server ..." ;;
+stop)
+ echo "stop server ..." ;;
+restart)
+ echo "Restarting server ..." ;;
+status)
+ echo "Running ..." ;;
+*)
+ echo "`basename $0` {start|stop|restart|status}" ;;
+esac
+写一个脚本，可以接受选项及参数，而后能获取每一个选项，及选项的参数；并能根据选项及参数做出特定的操作
+#!/bin/bash
+DEBUG=0
+case $1 in
+-v|--verbose)
+ DEBUG=1 ;;
+esac
+useradd tom &> /dev/null
+[ $DEBUG -eq 1 ] && echo "add user tom fininshed."
+写一个脚本，可以接受选项及参数，而后能获取每一个选项，及选项的参数；并能根据选项及参数做出特定的操作，比如：admin.sh --add tom,jerry --del tom,blair -v|--verbose -h|--help
+#!/bin/bash
+DEBUG=0
+ADD=0
+DEL=0
+USERS=0
+for I in `seq 0 $#`; do
+if [ $# -gt 0 ]; then
+case $1 in
+-v|--verbose)
+ DEBUG=1
+ shift ;;
+-h|--help)
+ echo "Usage: `basename $0` --add USER_LIST --del USER_LIST -v|verbose -h|help"
+ exit 0
+ ;;
+--add)
+ ADD=1
+ ADDUSERS=$2
+ shift 2
+ ;;
+--del)
+ DEL=1
+ DELUSERS=$2
+ shift 2
+ ;;
+*)
+ echo "Usage: `basename $0` --add USER_LIST --del USER_LIST -v|--verbose -h|--help"
+ exit 7
+ ;;
+esac
+fi
+done
+echo $DEBUG $ADD $DEL
+if [ $ADD -eq 1 ]; then
+ for USER in `echo $ADDUSERS | sed 's/,/ /g'`; do
+  if id $USER &> /dev/null; then
+   [ $DEBUG -eq 1 ] && echo "$USER exists."
+  else
+   useradd $USER
+   [ $DEBUG -eq 1 ] && echo "Add user $USER finished."
+  fi
+ done
+fi
+if [ $DEL -eq 1 ]; then
+ for USER in `echo $DELUSERS | sed 's/,/ /g'`; do
+  if id $USER &> /dev/null; then
+   userdel -r $USER
+   [ $DEBUG -eq 1 ] && echo "Delete $USER finished."
+  else
+   [ $DEBUG -eq 1 ] && echo "$USER not exist."
+  fi
+ done
+fi
+此脚本用法，./admin.sh -v --add tom,jerry,natasha --del tom,jerry,natasha
+./admin.sh -v --add tom,jerry,natasha
+./admin.sh -v --del tom,jerry,natasha
+写一个脚本showlogged.sh，其用法格式为：showlogged.sh -v -c -h|--help 其中，-h选项只能单独使用，用于显示帮助信息：-c选项时，显示当前系统上登录的所有用户：如果同时使用了-v选项，则即显示同时登录的用户数，又显示登录的用户的相关信息
+#!/bin/bash
+declare -i DEBUG=0
+declare -i SHOWNUM=0
+declare -i SHOWUSERS=0
+for I in `seq 1 $#`; do
+ if [ $# -gt 0 ]; then
+  case $1 in
+   -h|help)
+    echo "Usage: `basename $0` -h|help -c|--count -v|--verbose"
+    exit 0 ;;
+   -v|-verbose)
+    let SHOWUSERS=1
+    shift ;;
+   -c|--count)
+    let SHOWNUM=1
+    shift ;;
+   *)
+    echo "Usage: `basename $0` -h|help -c|--count -v|--verbose"
+    exit 8 ;;
+  esac
+ fi
+done
+if [ $SHOWNUM -eq 1 ]; then
+ echo "Logged users: `who | wc -l`"
+ if [ $SHOWUSERS -eq 1 ]; then
+  echo "They are;"
+ fi
+fi
+

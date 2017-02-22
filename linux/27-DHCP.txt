@@ -1,0 +1,74 @@
+﻿DHCP：Dynamic Host Configuration Protocol <-- bootp
+
+配置TCP/IP需要以下内容：
+IPADDR
+NETMASK
+GATEWAY
+DNS
+IPADDR跟NETMASK是最根本的
+
+DHCP过程
+Client-->DHCPDISCOVER
+		 DHCPOFFER <-- SERVER
+Client-->DHCPREQUEST
+		 DHCPACK<-- SERVER
+
+继租
+Client --> DHCPREQUEST
+		   DHCPACK<-- SERVER
+
+安装dhcp服务器
+yum install dhcp
+rpm -ql dhcp  #查看安装后生成的文件
+cp /usr/share/doc/dhcp-4.2.5/dhcpd.conf.example /etc/dhcp/dhcpd.conf   #复制模版并覆盖原有的内容，只适合在刚装完dhcp服务器的时候用
+
+subnet里是配置的，以下是配置项内容
+subnet 192.168.0.0 netmask 255.255.255.0 {
+option routers  192.168.0.1;   #网关
+option subnet-mask  255.255.255.0;   #子网掩码
+option domain-name  "domain.org";   #域名，相当于/etc/resolv.con里的search localdomain 搜索域
+option domain-name-server   192.168.1.1;  #定义dns服务器，当多个时用逗号隔开
+option time-offset -1800; #时间偏移，用于定义时区
+range dynamic-bootp 192.168.0.128 192.168.0.254;   #指定地址池，linux上的dhcp服务器分配是从大到小分配的
+default-lease-time 21600;  #租约长度
+max-lease-time  43200;   #最大租约长度  单位是秒
+host ns {  #定义保留地址host自己定义 ns自己定义用于识别客户端
+hardware ethernet 12:34:56:78:AB:CD;  #客户端的MAC地址
+fixed-address 192.168.0.112;    #定义保留客户端的地址
+}
+}
+
+subnet 192.168.0.0 netmask 255.255.0.0 {
+option routers  172.16.0.1;   #网关
+option subnet-mask  255.255.0.0;   #子网掩码
+option domain-name  "domain.org";   #域名，相当于/etc/resolv.con里的search localdomain 搜索域
+option domain-name-server   172.16.0.1,202.102.224.68;  #定义dns服务器，当多个时用逗号隔开
+option time-offset -1800; #时间偏移，用于定义时区
+range 172.16.100.10 172.16.100.20;   #指定地址池的范围
+default-lease-time 21600;  #租约长度
+max-lease-time  43200;   #最大租约长度  单位是秒
+host ns {  #定义保留地址host自己定义 ns自己定义用于识别客户端 专用地址优先使用用
+hardware ethernet 12:34:56:78:AB:CD;  #客户端的MAC地址
+fixed-address 172.16.100.33;    #定义保留客户端的地址
+}
+}
+
+文件说明
+/usr/sbin/dhcpd  #dhcp服务
+/usr/sbin/dhcrelay  #中继器，一般中继跟dhcp不一块使用，只需启动一个即可
+/usr/lib/systemd/system/dhcpd.service  #dhcp服务
+/usr/lib/systemd/system/dhcrelay.service  #中继器的服务
+/var/lib/dhcpd/dhcpd.leases   #dhcp的租约的地址记录信息
+/etc/dhcp/dhcpd.conf  #dhcp服务
+
+dhcp服务器是工作udp协议上
+服务器监听的端口是67/UDP
+客户端监听的端口是68/UDP
+
+/var/lib/dhcpd/dhcpd.leases  显示dhcp的租约信息
+
+ifconfig eth0 down
+dhclient  #启动eth0并用dhcp服务器分配的地址
+dhclient -d #dhclient 命令只可以使用一次，如果想使用必需把服务给kill掉。用-d选项可以不用kill就执行
+
+

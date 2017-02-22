@@ -1,0 +1,87 @@
+OpenSSL：SSL的开源实现
+ libcrypto：加密库
+ libssl：TLS/SSL的实现
+  基于会话的、实现了身份认证、数据机密性和会话完整性的TLS/SSL库
+ openssl：多用途命令工具
+  实现私有证书颁发机构
+  
+/etc/pki/tls/openssl.cnf是openssl的配置文件
+
+openssl实现私有CA：
+1、生成一对密钥
+2、生成自签署证书
+
+生成CA
+openssl genrsa 2048 > server.key   #生成一个长度为2048位的rsa私钥CA并保存到server.key文件中，默认长度为512
+(umask 077; openssl genrsa -out server1024.key 1024)   #生成一个长度为1024的密钥并保存到server.key文件中,文件的权限是600
+openssl rsa -in server1024.key -pubout   #读入密钥文件把公钥输出
+
+openssl genrsa -out /PATH/TO/KEYFILENAME NUMBITS  #保存密钥到文件
+openssl rsa in /PATH/TO/KEYFILENAME -pubout   #读入密钥文件把公钥输出
+
+生成证书
+openssl req -new -x509 -key server1024.key -out server.crt -days 365   #生成一个自签证书
+openssl x509 -text -in server.crt  #输出自签证书信息
+
+在系统是生成一个证书是无法使用的，需要结合/etc/pki/tls/openssl.cnf配置文件来完成
+这个文件里默认CA的信息
+[ CA_default ]
+dir            =../../CA
+certs          =$dir/certs
+crl_dir        =$dir/crl
+database       =$dir/index.txt
+一般dir用相对路径有问题需要改为绝对路径/etc/pki/CA
+(umask 077; openssl genrsa -out private/cakey.pem 2048)  #生成私钥
+openssl req -new -x509 -key private/cakey.pem -out cacert.pem  #生成自签证书
+mkdir certs newcerts crl  #如果没有创建这三个目录
+touch index.txt
+touch serial
+echo 01 > serial
+
+为web服务器生成证书
+mkdir /etc/httpd
+cd /etc/httpd
+mkdir ssl
+cd ssl
+(umask 077; openssl genrsa -out httpd.key 1024)
+openssl req -new -key httpd.key -out httpd.csr   #生成证书签名请求
+openssl ca -in httpd.csr -out httpd.crt -days 365  #这一步要拿到服务器上
+
+
+如果有命令忘记怎么写可以看/etc/pki/tls/certs/Makefile文件里是怎么写的
+
+
+
+
+
+
+openssl version  #查看openssl版本
+
+openssl ?   #查看帮助信息
+
+openssl speed  #测试加密算法的速，如果不给算法则测试所有的加密算法速度
+ openssl speed des  #测试des的时间
+
+whatis passwd  #一般man前可以用whatis查看一个命令
+man sslpasswd
+
+enc对文件内容进行加密
+openssl enc -des3 -salt -a -in inittab -out inittab.des3  #对inittab文件进行base64位编码后用des3加密，加密过后文件名是inittab.des3
+openssl enc -des3 -d -salt -a -in inittab.des3 -out inittab  #把inittab.des3再解密回来到文件inittab文件里
+
+dgst对文件生成特征码
+openssl dgst -sha1 inittab  #用sha1算法对文件inittab提取特征码
+openssl dgst -md5 inittab  #用md5算法对文件inittab提取特征码
+
+passwd
+openssl passwd -1  #用md5对密码进行加密
+openssl passwd -1 -salt aaa  #加salt内容aaa后对密码进行md5加密
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,21 @@
+当服务器资源不够用时通常有以下几种方式：
+Scale On：向上扩展(相当于把原有的服务器进行升级)  一般来说硬件的扩展不是线性增长的。可能在一定的情况下是线性增长的。cpu核数越多它们之间产生的资源竞争也会产生更多的资源。
+Scale Out：向外扩展(相当于原来一个服务器，横向变为两个)  这个就是负载均衡。
+
+web网络上传附件可以建立一个nfs服务器，把服务器附件的地址入到nfs服务器里。
+rsync+inotify：来解决负载均衡程序更新问题
+
+集群类型：
+LB：是增加服务处理性能力的
+HA(High Availability,高可用集群)：是增加服务可用性能力的 在线时间/(在线时间+故障处理时间)
+HP(HPC)：High Performance高性能计算集群；并行处理集群分为：分布式文件系统与将大任务切割为小任务，分别处理的机制 。hadoop就是并行处理集群。
+
+共享存储分为：
+DAS：Direct Attached Storage直接附加储存
+NAS：Network Attached Storage网络附加储存
+
+STONITH：Shoot The Other Node In The Head
+
+集群的节点最少要有3个或者奇数个。
+
+36-02

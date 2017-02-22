@@ -1,0 +1,135 @@
+nsswitch：网络服务转换开关
+App -> nsswitch ->resolve_lib
+
+nsswitch配置文件：/etc/nsswitch.conf  定义某一种名称解析通过那种试进行查找，内容如下
+passwd:file  #通过文件方式找
+grooup:file  #通过文件方式找
+hostname:file dns   #以文件为主，如果文件找不到就通过dns的方式去找
+shadow:file
+services:   nisplus [NOTFOUND=return] files  #当service以nisplus方式查找的结果是NOTFOUND就直接return不再去文件里查找，其他状态去文件里查找
+		SUCCESS：服务正常，默认当为些项时就return
+		NOTFOUND：服务正常，但是没有所查找的条目
+		UNAVAIL：服务不可用
+		TRYAGAIN：服务有临时性的故障
+
+/usr/lib[64]/{libnss_compat.so, libnss_dns.so, libnss_files.so, libnss_nis.so, libnss_winbind.so, libnss_wins.so} 等文件来实现名称解析认证过程
+
+libnss名称解析服务
+
+/etc/protocols
+/etc/services
+为协议名称解析提供对应信息
+
+
+
+getent：从某个库中获得所有条目
+
+
+例子：
+getent passwd  #得到passwd所有的条目
+getent hosts   #得到hosts文件里的所有条目
+getent passwd root  #得到root的条目
+getent hosts www.f273c.com   #得到www.f273c.com的条目，如果目录里没有则会到dns里找
+
+
+名称解析
+ libnss来解析
+认证
+ pam来认证
+ 认证本身也可以不用借助名额解析服务去查找用户原来存放的密码
+ 认证需要依赖名称解析，但不是必须的。认证自己也可以实现名称解析。
+
+名称解析跟认证是两套各自独立的运行机制
+
+
+Authentication
+md5:/etc/shadow
+mysql
+ldap
+nis
+Kerberos
+
+
+PAM：Pluggable Authentication Modules
+
+
+PAM的配置文件在/etc/pam.conf(系统是没有，一般用pam.d下的所有配置文件)与/etc/pam.d/*(一般文件名与服务名一样，文件名必须小写)
+列的说明：
+type：类型，所应用的场景
+control：当某种类型有多个是，之间是怎么作用的
+module-path：完成这个功能要使用的模块
+module-arguments：模块使用的参数，参数不一定是必须的
+
+/etc/pam.d/other是用于定义默认规则
+
+
+/etc/pam.d/system-auth-ac文件说明：
+auth        required      pam_env.so    #required用户登录必须检票，后面的也要检查
+auth        sufficient    pam_fprintd.so  #sufficient如果通过，直接反回给应用程序，不通过继续检查
+auth        sufficient    pam_unix.so nullok try_first_pass   #sufficient如果通过，直接反回给应用程序，不通过继续检查
+auth        requisite     pam_succeed_if.so uid >= 500 quiet    #requisite如果没过直接返回给应用程序，过了继续检查
+auth        required      pam_deny.so   #required用户登录必须检票，后面的也要检查
+
+account     required      pam_unix.so   #required用户登录必须检票，后面的也要检查
+account     sufficient    pam_localuser.so    #sufficient如果通过，直接反回给应用程序，不通过继续检查
+account     sufficient    pam_succeed_if.so uid < 500 quiet    #sufficient如果通过，直接反回给应用程序，不通过继续检查
+account     required      pam_permit.so    #required用户登录必须检票，后面的也要检查
+
+password    requisite     pam_cracklib.so try_first_pass retry=3 type=    #requisite如果没过直接返回给应用程序，过了继续检查
+password    sufficient    pam_unix.so sha512 shadow nullok try_first_pass use_authtok
+password    required      pam_deny.so    #required用户登录必须检票，后面的也要检查
+
+session     optional      pam_keyinit.so revoke
+session     required      pam_limits.so   #required用户登录必须检票，后面的也要检查
+session     [success=1 default=ignore] pam_succeed_if.so service in crond quiet use_uid
+session     required      pam_unix.so    #required用户登录必须检票，后面的也要检查
+
+
+
+默认情况下模块使用的是相对路径(在/lib/security或/lib64/security下)
+pam_unix
+ 参数：
+  nullok
+  shadow：到/etc/shadow文件里存取读取密码
+  md5：以md5加密密码
+pam_ermit：允许访问
+pam_deny：拒绝访问
+pam_cracklib：根据检查用户密码的安全性
+pam_shell：限制用户登录时使用的shell必须是/etc/shells下的shell
+pam_securetty：限定管理员只可以登录的设备，限定在/etc/securetty文件里
+pam_listfile：到某个文件里验证用户是否合法
+pam_limits：在一次用户会话里，用户可以使用系统资源的限定配置文件是/etc/security/limits.conf或者/etc/security/limits.d里
+ <domain>：对谁限制
+  可以是用户名
+  可以是组名
+  #：所有
+  %
+ <type>：限制的类型
+  soft：软限制，普通用户只可以用soft
+  hard：硬限制
+ <item>：限制资源的类型
+  core：能打开核心文件大小
+  data：
+  fsize：
+  memlock：
+  nofile：打开最大文件个数
+  rss：可用使用最大内存
+  stack：
+  cup：可以使用cpu的最长时间，单位是分钟
+  nproc：用户最多可以打开多少个进程
+  as：地址空间限制
+  maxlogins：
+  maxsyslogins：
+  locks：
+  sigpending：
+  msgqueue：
+  nice：
+  rtprio：
+ <value>：上限是多大
+ ulimit：此命令可以调整这里的参数
+pam_env：给用户设置环境变量，配置文件/etc/security/pam_env.conf
+pam_whell：允许只有whell组才可以su到root，可以在/etc/pam.d/su文件里启用
+pam_succeed_if：检查一个用户的id号大于500可以登录操作系统，小于500就不通过
+pam_time：根据时间来限定登录，配置文件在/etc/security/time.conf
+
+

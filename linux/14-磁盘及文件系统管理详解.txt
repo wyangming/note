@@ -1,0 +1,395 @@
+磁盘及文件系统管理详解
+
+磁盘管理：
+
+机械式硬盘：
+	U盘，光盘，软盘，硬盘，磁带机
+磁盘是机械式设备
+
+ln [-s -v] SRC DEST
+	创建链接，默认创建硬连接
+	SRC：源文件
+	DEST：创建链接的文件
+	
+	参数：
+		不带参数表示创建硬链接
+		-s：创建软链接,软链接必须是绝对路径。软链接存的是一个路径，原文件被删除可以再创建一个或者再用其他文件放到原位与原名，软链是不会被损坏的
+		-v：显示过程
+例子：
+ln -sv /root/backup/abc /root/backup/test/abc2 创建/root/backup/abc的软链接放到/root/backup/test/下的abc2文件
+ln abc test/abc2 创建abc文件硬链接位于test下的abc2
+
+硬链接：
+	只能对文件创建，不能应用于目录
+	不能跨文件系统
+	创建硬链接会增加文件被链接的次数
+
+符号链接：
+	可应用于目录
+	可以跨文件系统
+	不会增加被链接文件的链接次数
+	其大小为指定的路径所包含的字符个数
+
+du：显示目录及目录所有可以找到的子文件占用的空间大小
+	参数：
+		-s：目录占用的空间大小
+		-h：进行单位换算
+
+df：文件系统空间使用情况
+	参数：
+		-h：单位换算
+		-i：显示inode的情况
+		-P：信息在同一行显示
+
+设备文件：
+	块设备(b)：按块为单位，随机访问的设备
+	字符设备(c)：按字符为单位，线性设备
+	管道设备(p)
+	
+	b：硬盘
+	c：键盘
+
+/dev
+	主设备号(major number)
+		标识设备类型
+	次设备号(minor number)
+		标识同一种类型中不同设备
+
+mknod：创建设备文件
+	mknod [OPTION] NAME TYPE [MAJOR MINOR]
+	参数：
+	-m MODE：指定设备的权限，MODE是权限
+例子：
+mknod /dev/mydev c 66 0
+mknod -m 640 /dev/mydev2 c 66 1
+
+tty：显示自己tty设备的路径信息
+	echo "hello" >> /dev/pts/1：向其他登录设备发送信息
+	echo "hello" >> /dev/pts/0
+	echo "hello" >> /dev/sad：把硬盘的Bootload损坏掉，系统启动不起来
+
+硬盘设备的设备文件名：
+IDE, ATA：以hd开头
+SATA：以sd开头
+SCSI：以sd开头
+USB：以sd开头
+	用a, b, c,...来区别同一种类型下的不同设备
+
+IDE：
+	第一个IDE口：主盘，从盘
+		/dev/hda, /dev/hdb
+	第二个IDE口：主盘，从盘
+		/dev/hdc, /dev/hdd
+
+sda, sdb, sdc...
+
+hda:
+	hda1：第一个主分区
+	hda2：
+	hda3：
+	hda4：
+	hda5：逻辑分区只能从5开始，也是第一个逻辑分区，扩展分区只可以有一个
+
+格式化分为高级格式化与低级格式化；低级格式化是厂商完成的，自己搞还会出问题。高级格式化就是创建文件系统
+	
+查看当前系统识别了几块硬盘
+fdisk -l：列出当前系统所有的磁盘及磁盘信息
+fdisk -l /dev/sda：只看这一个设备的信息
+
+fdisk -l [/dev/to/some_device_file]
+
+管理磁盘分区：
+	fdisk /dev/sda  管理的时候直接指定要管理的设备
+		m：帮助
+		p：显示当前硬盘上的分区，包括没有保存的改动
+		n：创建新分区
+			e：扩展分区
+			p：主分区
+			当选择起始柱面时可直接回车
+			结束面的时候可以用+50G(G表示大小的单位)
+			
+			如果想创建大于4个分区，需要在前4个分区中创建一个扩展分区来创建逻辑分区
+		d：删除一个分区
+		w：保存退出
+		q：不保存退出
+		t：修改分区类型，即文件系统类型
+			L：修改分区的时候，显示文件系统类型
+			选择那个分区
+			输入分区编号
+		l：显示所有的文件系统类型
+		
+例子：
+fdisk /dev/sda  进入交互式命令
+	p：查看分区信息
+	n：创建新分区
+	p：创建主分区
+	5367：从第5367个柱面开始
+	+10G：分配大小为10G
+	n：创建分区
+	4：第4个分区
+	e：创建扩展分区
+	5367：第5367个柱面开始
+	15665：到15665结束，全部用完
+	n：新建逻辑分区
+	+10G：新建分区大小为10G
+	t：调整分区
+	5：调整第5个分区
+	L：查看分区类型
+	82：把第5个分区调整为Linux swap分区类型
+	p：查询修改分区类型是否成功
+	w：保存后退出
+在交互式命令里如果要删除按下Ctrl键再加上Backspace即可删除
+
+cat /proc/partitions 显示内核所识别的分区信息
+
+partprobe(红帽5)通知内核重读分区表来识别新建的分区
+partprobe [/dev/sda] 通知内核重读/dev/sda硬盘
+partx(红帽5)通知内核重读分区表来识别新建的分区
+
+linux支持的文件系统
+
+linux使用VFS(Virtual FileSystem)机制
+
+文件系统管理
+	重新创建文件系统会损坏原有文件
+
+cat /proc/filesystems：查看当前内核所支持的文件系统类型
+
+文件系统类型：
+	ext2
+	ext3
+
+mkfs(make file system)
+	参数：
+		-t FSTYPE 指定创建在那个分区上：创建某个文件系统在某个分区上
+	例子：
+		mkfs -t ext4 /dev/sda5 把/dev/sda5格式化成ext4的文件系统
+			显示的信息：
+				Filesystem label：文件系统的卷标即文件系统标签
+				OS type：操作系统
+				Block size：块大小
+		mkfs -t ext3 /dev/sda7 ext3支持日志功能
+		mkfs -t vfat /dev/sda5 把硬盘模式化为fat32(linux里把fat32识别为vfat)
+mkfs -t ext2 = mkfs.ext2
+mkfs -t ext3 = mkfs.ext3
+mkfs -t vfat = mkfs.vfat
+linux把fat32识别为vfat
+
+专门管理ext系列文件系统：
+mke2fs：管理ext系列文件系统的命令
+	参数：
+		-j：加上表示ext3系统不加是ext2系统
+		-b BLOCK_SIZE：指定为块大小，默认为4096：可用取值为1024, 2048, 4096
+		-L LABEL：指定分区卷标
+		-m #：指定预留给超级用户的块数百分比
+		-i #：指定多少个字符一个inode，默认为8192；这里给出的数字应该为块大小的2的n次方倍
+		-N #：指定要创建的inode个数
+		-F：强制创建文件系统，如果文件系统已经被挂载，用引起可以强行创建文件系统
+		-E：用于指定额外的文件系统属性
+例子：
+mke2fs -j /dev/sda5 把/dev/sda5格式化为ext3文件系统
+mke2fs /dev/sda5 把/dev/sda5格式化为ext2文件系统
+mke2fs -b 2048 /dev/sda5 把/dev/sda5格式化为ext2文件系统，并指定block块大小为2048
+mke2fs -L mydata /dev/sda5 把/dev/sda5格式化为ext2文件系统，并指定卷标为mydata
+mke2fs -m 3 /dev/sda5 把/dev/sda5格式化为ext2文件系统，并指定预留给超级用户的大小为%3
+mke2fs -i 4096 /dev/sda5  把/dev/sda5格式化为ext2文件系统，并指定4096个inode
+
+blkid：查询或查看磁盘设备的性
+	UUID
+	TYPE
+	LABEL：卷标
+	例子：
+		blkid /dev/sda5
+
+e2label：用于查看或定义卷标
+	例子：
+		e2label /dev/sda5 查看/dev/sda5的卷标
+		e2label /dev/sda5 HELLODATA 设置/dev/sda5的卷标为HELLODATA
+
+tune2fs：调整文件系统的相关属性
+	参数：
+		-j：不损害原有数据，将ext2升级为ext3
+		-L LABEL：设定或修改卷标
+		-m #：修改预留百分比
+		-r #：指定预留的块数
+		-o：设定默认挂载选项
+			acl
+		-c #：指定挂载次数达到#次之后进行自检，0或-1表示关闭此功能
+		-i #：每挂载使用多少天后进行自检，0或-1表示关闭此功能
+		-l：显示超级块中的信息，分区中各种信息都会显示出来
+	例子：
+		tune2fs -j /dev/sda5
+		tune2fs -L MYDATA /dev/sda5
+
+dumpe2fs：显示文件系统属性信息
+	参数：
+		-h：只显示超级块信息
+	例子：
+		dumpe2fs /dev/sda5
+			查询出的信息有Free blocks代表空闲块，用的时候长会出现碎片
+
+fsck：查检并修复linux文件系统，文件系统出现问题时使用
+	参数：
+		-t FSTYPE：指定文件系统类型，常用选项，可以不指，如是一但指错就麻烦了
+		-a：自动修复，不询问自动完成修复
+
+e2fsck：专用于查检修复ext系列文件系统
+	参数：
+		-f：强制检查
+		-p：自动修复 
+		-a：自动修复
+
+挂载：将新的文件系统关联至当前根文件系统
+卸载：将某文件系统与当前文件系统的关联预以移除
+
+mount：挂载
+	mount 设备 挂载点
+		设备：
+			设备文件：/dev/sda5
+			卷标：LABEL=""
+			UUID：UUID=""
+		挂载点：目录
+			要求：
+				此目录没有被其他进程使用
+				目录得事先存在
+				目录中原有的文件将会暂时隐藏，除非卸载后才可以看见
+
+
+mount：显示当前系统已经挂载的及挂载点
+
+mount [options] [-o options] DEVICE MOUNT_POINT
+	-a：表示挂载/etc/fstab文件中定义的所有文件系统
+	-n：默认情况下，mount命令每挂载一个设备，都会把挂载的设备信息保存至/etc/mtab文件：使用-n意味着挂载设备时，不把信息写入此文件
+	-t FSTYPE：指定正在挂载设备上的文件系统类型：不使用些选项时，mount会调用blkid命令获取对应文件系统的类型；
+	-r：挂载文件系统为只读，挂载光盘时常用此选项
+	-w：读写挂载
+	
+	-o：指定额外的挂载选项，也即指定文件系统启用的属性
+		async：异步写入
+		atime：更新文件的访问时间
+		auto：可不可以自动挂载
+		defaults：默认选项
+		dev：起用设备上其他设备的访问入口
+		exec：让执行权限的执行文件执行起来
+		_netdev：如果设备处于网络，如果主机不通则不管
+		owner：允许普通用户挂载设备
+		remount：重新挂载当前文件系统
+		ro：挂载为只读
+		rw：读写挂载
+		sync：同步写入
+		suid：启用suid
+				
+挂载完成后，要通过挂载点访问对应文件系统上的文件。每个新挂载完成的新文件系统里都会有一个lost+found目录
+cat /etc/mtab显示所有硬盘挂载点的信息
+例子：
+mount /dev/sdb5 /mnt/test/ 把/dev/sdb5 挂载到/mnt/test/目录上
+mount /dev/cdrom /media/
+umount /dev/cdrom
+mount -r /dev/cdrom /media/
+umount /media/
+mount -o ro /dev/cdrom /media/
+umount /media/
+mount /dev/cdrom /media/
+mount -o remount,ro /dev/cdrom /media/ -o的多个选项用,号隔开
+
+umount：卸载某文件系统
+	umount 设备
+	或
+	umount 挂载点
+	
+	卸载注意事项：
+		卸载的设备没有进程使用
+例子：
+umount /dev/sdb5
+umount /mnt/test/  两个都是卸载/dev/sdb5分区的挂载点
+		
+swap分区(交换分区)
+虚拟内存：分区必须是linux swap类型
+交换空间的存在允许内存过载使用，交换空间只可以用于应急使用
+内存把数据放到交换分区的过程是page in取出是page out。站在交换分区是对立的。
+计算机里cpu的访问时间最快，访问时间1纳秒，缓存空间是10纳秒，内存是10毫秒，硬盘可能秒级别。过多使用交换分区会让系统性能大受影响，交换分区最好在性能比较好的硬盘上，如果是机械式硬盘最好放在靠外的磁道上。
+
+fdisk命令中，调整分区类型为82(linux swap)
+
+创建交换分区：
+	mkswap /dev/sda8
+		-L LABEL：指定卷标
+swapon /dev/sda8 启用设备上的swap交换分区
+	-a：启用所有的定义在/etc/fstab文件中的交换设备
+swapoff /dev/sda8 关闭设备上的swap交换分区
+
+free：查看系统上物理内存与交换空间的使用情况
+	参数：
+		-m：以m为单位查看，默认为字节
+	查询出信息意义：
+	total：总空间
+	useed：已使用空间
+	free：空闲空间
+	shared：
+	buffers：缓冲，主要是原数据
+	cached：缓存，数据
+缓冲与缓存是为了加速系统性能而设定
+
+回环设备(loopback):使用软件来模拟实现硬件
+	创建一个镜像文件，当作一个设备使用
+
+dd：转换并复制文件,dd复制的时候直接复制的是底层的数据流
+	dd if=/path of=/path
+	参数：
+		if=数据来源
+		of=数据存储目标
+		bs=1024：表示一次以1024个字节为单位进行复制
+		count=2：复制几次
+		seek=1023：跳过多少次复制
+
+	例子：
+		dd if=/dev/sda of=/mnt/usb/mbr.backup bs=512 count=1：备份mbr
+		dd if=/mnt/usb/mbr.backup of=/dev/sda bs=512 count=1：还原mbr
+	dd也可以用光盘制作镜像
+	cat /dev/cdrom > /root/rhel5.iso：制作镜像
+
+/dev/zero：泡泡设备向外吐01
+/dev/null：数据黑洞与/dev/zero相反
+
+利用本地文件创建交换分区并挂载卸载，这种性能更差，也是用来临时救急
+	dd if=/dev/zero of=/var/swapfile bs=1M count=1024：创建一个1G的虚拟交换分区
+	mkswap /var/swapfile
+	swapon /var/swapfile
+	swapoff /var/swapfile
+
+mount命令：可以挂载iso镜像
+mount DEVICE MOUNT_POINT
+
+mount挂载iso文件
+	mount -o loop /root/rhic-5.8-1.iso /media/
+
+在系统重启的时候使用mount命令挂载的所有文件系统都不会存在
+文件系统的配置文件/etc/fstab(文件系统表)
+	linux在初始化是，会自动挂载文件中定义的每个文件系统
+	字段义意：
+		要挂载的设备：可以用label，UUID，或者设备路径
+		挂载点
+		文件系统类型
+		挂载选项：默认为defaults
+		转储频率：多少天对文件系统进行备份，0表示不备份，1表示每天，2表示每隔一天；一般自己挂载的文件系统都不备份
+		文件系统的检测次序(只有根为1，开他的都为2，0表示不检查)
+
+在文件中添加一个自动挂载，如果想在defaults之外添加别的功能时，只需要在defaults之后用,隔开添加相应的功能即可
+LABEL='MYDATA'		/data		ext3		defaults, acl		0 0   ：表示启用ACL功能
+在/etc/fstab文件里如果自己挂载的文件系统在挂载的时候没有指定acl功能，默认是没有acl功能的
+		
+mount -a：挂载/etc/fstab文件中定义的所有文件系统
+
+fuser：验证进程正在使用的文件或套接字
+	参数：
+		-v：查看某文件上正在运行的进程
+		-k：把正在访问的进程给干掉
+		-m：指定挂载点
+	
+	fuser -km MOUNT_POINT：终止正在访问此挂载点的所有进程
+	
+	fuser /mnt/test ：查看/mnt/test是谁在访问
+	fuser -km /mnt/test ：把/mnt/test上的所有进程给干掉
+
+swap在/etc/fstab的挂载比较独特
+/dev/mapper/vg_centos-lv_swap swap                    swap    defaults        0 0

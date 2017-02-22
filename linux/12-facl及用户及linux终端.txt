@@ -1,0 +1,128 @@
+facl及用户及linux终端
+
+文件系统访问控制列表
+FACL(Filesystem Access Control List)
+	利用文件扩展属性，保存额外的访问控制权限
+
+setfacl：设置facl
+	-m：设定
+		[d:]u:UID:perm ：设定用户有某种权限，d只能在目录上设置，任何在目录中创建的文件自动继承目录的权限
+		[d:]g:GID:perm ：定组有某种权限，d只能在目录上设置，任何在目录中创建的文件自动继承目录的权限
+	-x：取消
+		u:UID ：取消设定用户的权限
+		g:GID ：取消设定用户组的权限
+	
+	例子：
+		setfacl -m u:hadoop:rw inittab 给hadoop用户添加对inittab文件的读写权限
+		setfacl -m g:hadoop:rw inittab 给hadoop组添加对inittab文件的读写权限
+		setfacl -x u:hadoop inittab 取消hadoop用户的权限
+		setfacl -x g:hadoop inittab 取消hadoop用户组的权限
+getfacl：得到facl
+	例子：
+		getfacl inittab 查看inittab的属性信息
+
+用户访问文件顺序：
+	owner->group-other
+	owner->facl,user->group->facl,group->other
+
+当一个具有扩展属性的文件被复制或归档的时候很可能扩展属性不会被复制或归档
+	
+mask：facl的权限不可以超出mask的权限，如果起出的话把超出的权限全部截掉
+
+whoami：查看当前登录到系统上的有效用户
+
+who：显示登录到当前系统上的用户，及所用的终端
+	用户
+	终端
+	时间
+	参数：
+		-r：显示当前运行级别的
+		-H：显示每一列的头部
+
+终端是物理设备，是必须关联到物理硬件上
+	终端类型：
+		console：控制台，是直接连接到硬件设备上的硬件设备。通常是软件跟硬件的结合
+		pty：物理终端(GVA)，设备已经被识别出来
+		tty：虚拟终端(GVA)，通常附加在物理控制台上，并结合软件实现
+		ttyS：串行终端
+		pts/#：伪终端
+
+shell：
+
+sleep：让进程延迟几秒钟
+	例子
+		sleep 3 让进程延迟3秒
+
+w：谁已经登录，干什么的信息。显示的信息比who更详细
+
+last：显示用户的登录历史，及终统重启历史，用于显示/var/log/wtmp文件的
+	参数：
+		-n #：显示最近几次的登录信息
+
+lastb：/var/log/btmp文件，显示用户错误的登录尝试
+	参数：
+		-n #：显示最近几次的错误登录信息
+
+lastlog：显示每一个用户最近一次成功登录的信息
+	参数：
+		-u 用户名：显示特定用户最近的登录信息
+
+basename：显示路径的基名
+	$0：执行脚本时的脚本路径及名称
+	例子：
+		basename /root/backup/inittab 返回inittab文件件名
+		basename $0 在shell脚本里返回命令本身
+
+mail：用来查看邮件，如果都看完了邮件会放到用户家目录下mbox里，也可以用来发邮件
+	进入邮件后输入邮件的id查看邮件，看完后可以用q退出。
+	参数：
+		-s：指定发邮件的标题
+	例子：
+		cat /etc/fstab | mail -s "How are you ?" root 把/etc/fstab的内容当作邮件发送给root用户
+		mail -s "How are you ?" root < /etc/fstab 把/etc/fstab的内容当作邮件发送给root用户
+		cat /etc/fstab | mail -s "How are you?" root 跟上一个效果是一样的
+
+hostname：显示当前主机的主机名跟echo $HOSTNAME一样。$HOSTNAME是登录时的主机名，hostname是实时的主机名
+例子：
+如果当前的主机名不是www.magedu.com就改为www.magedu.com
+[ `hostname` != 'www.magedu.com' ] && hostname www.magedu.com
+如果当前的主机名为空，或者为(none)，或者为localhost，就将其改为www.magedu.com
+[ -z `hostname` ] || [`hostname` == '(none)' -o `hostname` == 'localhost' ] && hostname www.magedu.com
+
+随机数生成器：熵(shang 一声)池
+	/dev/random：当熵池空的时候会让敲键盘来生成随机数，熵池会阻塞
+	/dev/urandom：当熵池空的时候会用软件生成随机数，熵池不会阻塞
+RANDOM：从0到32768之间的数，随机选
+
+echo $RANDOM
+
+例子：
+生成10个随机数
+#!/bin/bash
+for I in {1..10}; do
+ if [ $I -le 9 ]; then
+  echo -n "$RANDOM,"
+ else
+  echo "$RANDOM"
+ fi
+done
+生成10个随机数，并打印出最大值最小值
+#!/bin/bash
+declare -i MAX=0
+declare -i MIN=0
+for I in {1..10}; do
+ MYRAND=$RANDOM
+ [ $I -eq 1 ] && MIN=$MYRAND
+ if [ $I -le 9 ]; then
+  echo -n "$MYRAND,"
+ else
+  echo "$MYRAND"
+ fi
+ [ $MYRAND -gt $MAX ] && MAX=$MYRAND
+ [ $MYRAND -lt $MIN ] && MIN=$MYRAND
+done
+echo $MAX, $MIN
+
+
+
+

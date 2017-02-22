@@ -1,0 +1,91 @@
+任何一个samba用户都必须是系统用户，但是密码不是
+
+
+
+rpm -e samba-client.x86_64 samba-common.x86_64 samba-winbind.x86_64 samba-winbind-clients.x86_64 samba4-libs.x86_64 --nodeps
+yum install samba4 samba4-client samb4-common
+cd /etc/samba
+vim smb.conf  #以#号开头的是注释，;号开头的是可以启用的配置注释
+#全局配置
+netbios name = MYSERVER   #netbios主机名称
+workgroup = MYGROUP   #工作组
+server string = Samba Server Version %v   #提示描述信息，%v版本信息
+host allow = 192.168.1. 127.   #允许那些ip访问
+#日志配置
+log file = /var/log/samba/log.%m  #每个客户端到主机上访问的日志，%m表示客户端主机名字
+max log size = 50   #最大日志文件，超过将会滚动
+#独立运行配置
+security = user   #
+passdb backend = tdbsam   #用户的账户密码存放密码
+#打印机配置
+load printers = yes   #是否共享打印机
+cups options = raw   #打印服务的选项
+#文件系统配置
+
+#共享定义配置
+[homes]
+comment = Home Directories   #注释
+browseable = no    #是否可以被浏览到
+writable = yes    #是否具有写权限
+[printers]
+comment = All Printers  #注释，所有打印机
+path = /var/spool/samba   #打印机路径
+browseable = no    #是否可以被浏览到
+guest ok = no   #是否允许来宾账号访问
+writable = no   #是否可写
+printable = yes   #是否允许打印
+
+
+#共享一个目录用到的
+[shared_name]   #共享名
+comment = Home Directories   #注释
+path = /var/spool/samba   #打印机路径
+browseable = no    #是否可以被浏览到
+guest ok = no   #是否允许来宾账号访问
+read only = yes   #是否只读
+writable = no   #是否可写
+write list = +staff   #定义可写用户列表
+			user1,user3,@group,+group
+valid uesrs =     #共享只允许那些人访问
+invalid users =    #共享不允许那些人访问
+
+
+
+mkdir -pv /share/test
+vim smb.conf  #在最后添加以下文件
+[tools]
+        comment = Share Testing
+        path = /share/test
+        public = yes
+        writable = yes
+#退出测试
+testparm  #测试写的配置文件是否有错
+service smb start
+
+
+#添加samba用户
+smbpasswd -a hadoop   #把hadoop用户账号做为samba用户账号并设置密码
+setfacl -m u:hadoop:rwx /share/test/  #给hadoop在/share/test/下有读写执行权限
+
+\\192.168.1.106  #直接可以在windows上以这种方式来访问用户的共享目录与家目录
+
+
+smbclient //192.168.1.103/note -U hadoop  #访问windows上的共享也可以访问linux上的共享
+
+mount -t cifs //192.168.1.106/tools /mnt -o username=hadoop   #hadoop的身份挂载192.168.1.106上的tools共享到/mnt目录下
+
+
+#实现开机自动挂载
+vim /etc/fstab  #内容如下
+//192.168.1.106/tools		/mnt		cifs		credentials=/etc/samba/cred.passwd		0 0
+#建立/etc/samba/cred.passwd
+vim /etc/samba/cred.passwd  #内容如下
+username=hadoop
+password=hadoop
+#退出后改权限
+chmod og=--- /etc/samba/cred.passwd
+#记属组跟其他用户没有任何权限
+
+
+samba：基于ip控制访问
+samba-swat：基于界面配置samba,自带有一个web服务器

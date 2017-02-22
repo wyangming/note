@@ -1,0 +1,2 @@
+如果没有netstat命令就安装yum install net-tools
+Centos7里系统换systemd管理服务

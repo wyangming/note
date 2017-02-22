@@ -1,0 +1,220 @@
+linux进程管理
+
+进程及作业管理
+
+Uninterruptible sleep：不可中断的睡眠
+Interruptible sleep：可中断睡眠
+
+
+kernel：内核生成init进程
+init：当前系统上所有的进程都是init的子进程
+	进程是由父进程回收的
+进程是有状态、父子关系、优先级
+
+linux中优先级从0-139个优先级，数字越小，优先级越高。
+	100-139：用户可控制
+		nice值：-20到19对应为100-139
+		普通用户仅能够调大自己的进程Nice值，管理员可以随便调
+	0-99：内核调整的
+优先级高：
+	获得更多的CPU运行时间
+	更优先获得运行的机会
+
+init：进程号永远为1
+
+/proc目录下每一个以数字命名的目录对应一个进程
+
+O：
+	O(1)
+	O(n)
+	O(logn)
+	O(n^2)
+	O(2^n)
+
+VSZ：虚拟内存集
+RSS：常驻内存集
+PSR：运行在那个CPU上
+加了中括号的进程是内核线程
+	
+进程分类：
+	跟终端相关的进程
+	跟终端无关的进程
+
+进程状态：
+	D：不可中断的睡眠
+	R：运行或就绪
+	S：可中断的睡眠
+	T：停止
+	Z：僵死
+	
+	<：高优先级进程
+	N：低优先级进程
+	+：前台进程组中的进程
+	l：多线程进程
+	s：会话进程的首进程
+	
+ps(Process State)：用参数时没有-字符
+	SysV(System V)风格：
+	BSD风格：
+	
+	参数：
+		BSD风格
+		a：显示所有与终端有关的进程
+		u：显示进程是由那个用户启动的
+		x：显示所有与终端无关的进程
+		
+		SysV风格
+		-elF：
+		-ef：
+		-eF：
+		
+		-o PROPERTY1,[PROPERTY2,] [...]：指定要显示的字段
+		
+凡是加中括号的进程全是内核线程
+ps -axo pid,comm,ni | head
+ps -el | head
+ps -elF | head
+	PRI：进程优先级
+	NI：nice值
+	PSR：正在运行在那个CPU上
+		
+pstree：显示当前系统上进程树
+pgrep：根据配置模式显示进程
+	参数：
+		-u：以那个有效用户运行的进程
+	例子：
+	pgrep -u root |head：查找前10个以root用户运行的进程
+	pgrep bash：查找bash相关的进程
+	pgrep -u root bash：查询以root用户运行的进程，并是bash的相关进程
+pidof：根据程序名称，查找相关进程的pid号
+	例子：
+	pidof init
+top：相当于windows的任务管理器
+	交互式命令：
+		M：根据驻留内存大小进行排序
+		P：根据CPU使用百分比进行排序
+		T：根据累计时间进行排序
+		
+		l：是否显示平均负载和启动时间
+		t：是否显示进程和CPU状态相关信息
+		m：是否显示内存相关信息
+		
+		d：是否显示完整的命令行信息
+		q：退出top
+		k：终止某个进程
+	参数：
+		-d #：指定延迟时长，刷新的时长
+		-b：批模式
+		-n #：在批模式下，共显示多少批
+top字段说明：
+第一行(top)：当前时间，运行时长，登录用户，平均负载(load average)1分钟5分钟15分钟的负载-值越小负载越低
+第二行(Tasks):所有进程total，运行的进程running单核是一个双核是两个，睡眠sleeping,停止stopped，僵死zombie
+第三行(cpu0)多核心时按1可在下行显示出相应的cpu信息：us用户空间，sy内核系统空间，ni是调整nice影响cpu的比例，id空闲，wa等待io完成点用的，hi硬件中段，si软中段，st被偷走的时间
+第四行(Mem)：总内存total，使用内存used，空闲free，buffers
+第五行(Swap)：总数，使用，空闲，cached
+PR：优先级
+NI：nice值
+VIRT：虚拟内存集
+RES：常住内存集
+SHR：共享内存大小
+S：状态
+
+kill：
+	参数：
+		-l：显示信息
+			1：SIGHUP：让一个进程不用重启，就可以重读配置文件，并让新的配置信息生效
+			2：SIGINT：Ctrl+c中断一个进程
+			9：SIGKILL：杀死一个进程
+			15：SIGTERM：终止一个进程，默认信号
+			
+			指定一个信号：
+				信号号码：kill -l
+				信号名称：kill -SIGKILL
+				信号名称简写：kill -KILL
+	例子：
+		kill 13310：杀死进程号为13310的进程
+
+kill PID：根据pid杀死一个进程
+killall COMMAND：杀死所有的COMMAND进程
+
+进程间通信(IPC:Inter Process Communication)
+	共享内存
+	信号：Signal
+	Semaphore
+kill -l 查看进程之间通信的信号
+重要信号
+1：SIGHUP：让一个进程不用重启，就可以重读其配置文件，并让新的配置信息生效
+2：SIGINT：Ctrl+c：中断一个进程
+9：SIGKILL：杀死一个进程
+15：SIGTERM：终止一个进程，默认信号
+
+指定一个信号：
+信号号码：kill -1
+信号名称：kill -SIGKILL
+信号名称简写：kill -KILL
+
+调整nice值
+调整已经启动的进程的nice值：
+renice NI PID
+
+在启动时指定nice值：
+nice -n NI COMMAND
+
+free
+pkill：与 pgrep一样
+
+前台作业：占据了命令提示符
+后台作业：启动之后，释放命令提示符，后续的操作在后台完成
+
+前台-->后台：
+	Ctrl+z: 把正在前台的作业送往后台，但是进程处于停止状态
+	COMMAND &：让命令在后台执行
+
+bg: 让后台的停止作业继续运行
+	bg [[%]JOBID]
+
+jobs: 查看后台的所有作业
+	作业号，不同于进程号
+		+：命令将默认操作的作业，bg不带任何参数时调用这个作业
+		-：命令将第二个默认操作的作业
+
+fg: 将后台的作业调回前台
+	fg [[%]JOBID]
+
+kill %JOBID: 终止某作业
+	kill %2：杀死作业号为2的进程
+
+vmstat：系统状态查看命令
+	vmstat #：每隔多少秒显示一次
+	vmstat # #：每隔多少秒显示一次，每次显示多少行
+说明：
+procs：进程
+	r：运行队列长度
+	b：阻塞队列长度
+memory：内存
+	swpd：交换
+	free：空闲
+	buff：缓冲
+	cache：缓存
+swap：
+	si：动态换进
+	so：动态换出
+io：磁盘块调入内存
+	bi：调入内存
+	bo：调出内存
+system：内核空间
+	in：中段的个数
+	cs：上下文切换的次数，进程切换的数数，每隔多长时间切换的次数，不是总次数
+cpu：
+	us：用户空间占用
+	sy：系统空间占用
+	id：空闲占用
+	wa：等待io占用
+	st：被偷走的
+
+uptime：与top命令的第一行信息显示的是一样的
+
+/proc/meminfo：查看内存相关信息
+/proc/cpuinfo：查看cpu信息
+
+cat /proc/数字/maps：查看相应进程占用的详细内存信息

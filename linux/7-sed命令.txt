@@ -1,0 +1,86 @@
+sed命令
+
+sed(流编辑器：Stream EDitor)
+	行编辑器(全屏编辑器：vi)
+
+编辑特性：每当处理一个文本的时候逐行读取到内存中，在内存中编辑，把编辑的结果输出到屏幕上。这段内存空间是模式空间。
+
+模式空间：处理的行可以用模式匹配进行处理，当匹配到时就用后面的编辑命令进行编辑输出到屏幕上
+
+sed默认不编辑原文件仅对模式空间中的数据做处理；而后，处理结果，将模式空间打印至屏幕
+
+用法：
+	sed [option]... {script-only-if-no-other-script} [inputfile]...
+	
+	sed [option] 'AddressCommand' file ...
+	
+		Address:
+			1、StartLine, EndLine
+				比如：1, 100从第1行到第100行
+				$：表示最后一行
+			2、/RegExp/：正则表达式
+				比如：/^root/ 找以root开头的行
+			3、/RegExp1/,/RegExp2/：匹配文件中第一次被RegExp1匹配到的行开至第一次被RegExp2匹配到的行结束，这中间的所有行
+			4、LineNumber：指定的行
+			5、StartLine, +N：从指定的行开始向后的N行
+			
+		AddressCommand：(如果AddressCommand里有变量需要替换则用的是"")
+			d：删除符合条件的行
+				比如：
+					sed '1,2d' /etc/fstab 把/etc/fstab下的前2行删除
+					sed '1,$-1d' /etc/fstab 把/etc/fstab下从第1行到倒数第2行删除
+					sed '/oot/d' /etc/fstab 删除行中带有oot的字符串
+					sed '1,+2d' /etc/fstab 删除前三行
+					sed '/^\//d' /etc/fstab 删除以/开头的行其中＼是转义字符
+			p：显示符合条件的行
+				比如：
+					sed -n '/^\//p' /etc/fstab 显示以/开头的行其中＼是转义字符
+			a \string：在指定的行后面追加新行，内空为string。支持\n字符换行
+				比如：
+					sed '/^\//a \# hello world' /etc/fstab 在以/开头的行后追加内容为# hello world的新行
+					sed '/^\//a \# hello world\n# hello linux' /etc/fstab 在以/开头的行后追两行内容分别为# hello world与# hello linux(\n:可用于换行)
+			i \string：在指定的行前面追加新行，内容为string，支持\n字符换行
+			r FILE：将内容添加至符合条件的行处
+				比如：
+					sed '2r /etc/issue' /etc/fstab 在/etc/fstab的第二行后面把/etc/issue里的所有内容添加进去
+			w FILE：将指定范围内的内容另存至指定的文件中
+				比如：
+					sed '/oot/w /tmp/oot.txt' /etc/fstab 将/etc/fstab里包含oot内容的行写到/etc/oot.txt文件中
+			s/RegExp/string/：查的并替换，默认只替换每行中每一次被匹配到的字符串
+				修饰符：
+					g：表示全局替换。位置：s/RegExp/string/g
+					i：查的时忽略字符大小写。
+				可以用#号来做分隔符，那样/就不用转义，也可以用@来做分隔符
+				也可以用后向引用\(\), \1, \2
+				&：表示引用模式匹配到的整个串
+				比如：
+					sed 's/oot/OOT/' /etc/fstab 将/etc/fstab文件里包含oot的字符替换为OOT
+					sed 's/^\//#/' /etc/fstab 将/etc/fstab里行首为/的字符替换为#
+					sed 's/\//#/g' /etc/fstab 将/etc/fstab里/的字符替换为#
+					sed 's@/@#@g' /etc/fstab 用@做分隔符
+					sed 's#l..e#&r#g sed.txt &的后向引用,把love替换为lover,like替换为liker
+					sed 's#\(l..e\)#\1r#g' sed.txt 后向引用,把love替换为lover,like替换为liker
+					sed 's/l\(..e\)/L\1/g' sed.txt 后向引用,把love改为Love,like改为Like
+
+		参数：
+			-n：静默模式，即不显示模式空间中的内容，不再默认显示模式空间中的内容
+			-i：直接修改原文件
+			-e SCRIPT -e SCRIPT：可以同时执行多个匹配模式
+			-f /path/sed_script_file：指定一个文件，文件件里的每一行是一个匹配模式
+				sed -f /path/to/scripts file
+			-r：表示使用扩展的正则表达式
+
+		例子：
+			history | sed 's#[[:space:]]##g' 替换第一个空格
+			history | sed 's#^[[:space:]]*##g' 替换行首的所有空格
+			history | sed 's#^[[:space:]]*##g' | cut -d' ' -f1 替换行首的所有空间并只显示第一列
+			sed -r 's/^[[:space:]]+//g' grub.conf 删除grub.conf文件中行首的空白字符
+			sed 's/\(id:\)[0-9]\(:initdefault:\)/\15\2/g' /etc/inittab 替换/etc/inittab文件中"id:3:initdefault:"一行中的数字为5
+			sed 's/^#//g' /etc/inittab 删除/etc/inittab文件中开头的#号
+			sed '/^$/d' /etc/inittab 删除/etc/inittab文件中的空白行
+			sed -r 's/^#[[:space:]]+//g' /etc/inittab 删除/etc/inittab中开头的#号及后面的空白字符，但要求#号后面必须有空白字符
+			sed -r 's/^[[:space:]]+#//g' /etc/inittab 删除/etc/inittab中以空白字符后面跟#类的行中的开头的空白字符及#
+			echo "/etc" | sed -r 's/^(\/.*\/)[^\/]+\/?/\1/g' 取出一个文件路径的目录名称
+			echo "/etc/rc.d" | sed -r 's/^\/.*\/([^\/]+)\/?/\1/g' 得到路径的文件名
+			
+

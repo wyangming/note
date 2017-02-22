@@ -1,0 +1,314 @@
+数组是在内存中连续的空间存放
+
+声明一个数组
+declare -a AA
+
+赋值数组方法1：
+AA[0]="jerry"
+AA[1]="tom"
+AA[2]="wendy"
+AA[6]="natasha"
+
+赋值数组方法2：
+AA=("jerry" "tom" "wendy")
+AA=([0]="jerry" [1]="tom" [2]="wendy" [6]="natasha")
+AA[3]="selina"
+AA[4]="nikita"
+
+中间空出的值为空，即null
+
+
+${#AA}      #一个数组中第一个元素的长度
+${#AA[0]}   #一个数组中第一个元素的长度
+${#AA[0]}   #一个数组中第二个元素的长度
+${#AA[*]}   #一个数组中元素的个数
+${#AA[@]}   #一个数组中元素的个数
+
+
+数组例子：
+随机生成一组数据，并找到最大值
+#!/bin/bash
+#
+for I in {0..9}; do
+ ARRAY[$I]=$RANDOM
+ echo -n "${ARRAY[$I]} "
+ sleep 1
+done
+echo
+declare -i MAX=${ARRAY[0]}
+for I in `seq 2 ${#ARRAY[*]}`;do
+ if [ $MAX -lt ${ARRAY[$I-1]} ]; then
+  MAX=${ARRAY[$I-1]};
+ fi
+done
+echo $MAX
+
+
+生成一个数组，
+1、数组中的元素个数为1-39
+2、数组元素不能相同
+3、显示此数组各元素的值
+#!/bin/bash
+#
+read -p "The element numbers[0-19]:" ELENUM
+declare -a ARRAY
+function COMELE {
+ local J
+ for J in `seq 0 $[${#ARRAY[*]}-1]`; do
+  if [ $1 -eq ${ARRAY[$J]} ]; then
+   return 1
+  fi
+ done
+ return 0
+}
+for I in `seq 0 $[$ELENUM-1]`; do
+ while true; do
+  ELEMENT=$[$RANDOM%40]
+  COMELE $ELEMENT
+  if [ $? -eq 0 ]; then
+   ARRAY[$I]=$ELEMENT
+   break
+  fi
+ done
+ echo "${ARRAY[$I]}"
+done
+
+
+
+trap：在脚本中捕捉信息，并且可以实现特定处理
+1：SIGHUP
+2：SIGINT
+9：SIGKILL  不可以捕捉
+15：SIGTERM  为可以捕捉
+18：SIGCONT
+19：SIGSTOP
+
+
+捕捉信号例子：
+#!/bin/bash
+#
+trap 'echo "NO QUIT..."' INT
+read -p "The element numbers[0-19]:" ELENUM
+declare -a ARRAY
+function COMELE {
+ local J
+ for J in `seq 0 $[${#ARRAY[*]}-1]`; do
+  if [ $1 -eq ${ARRAY[$J]} ]; then
+   return 1
+  fi
+ done
+ return 0
+}
+for I in `seq 0 $[$ELENUM-1]`; do
+ sleep 1
+ while true; do
+  ELEMENT=$[$RANDOM%40]
+  COMELE $ELEMENT
+  if [ $? -eq 0 ]; then
+   ARRAY[$I]=$ELEMENT
+   break
+  fi
+ done
+ echo "${ARRAY[$I]}"
+done
+#捕捉Ctrl+C信息，不让退出，并打印NO QUIT...
+
+
+#!/bin/bash
+#
+trap 'rm -rf /var/tmp/test; echo "clean...";exit 5' INT
+mkdir -p /var/tmp/test
+while true; do
+ touch /var/tmp/test/file-`date +%F-%H-%M-%S`
+ sleep 2
+done
+
+
+#!/bin/bash
+#
+CLEANUP() {
+ rm -rf /var/tmp/test
+ echo "clean..."
+}
+trap 'CLEANUP;exit 5' INT
+mkdir -p /var/tmp/test
+while true; do
+ touch /var/tmp/test/file-`date +%F-%H-%M-%S`
+ sleep 2
+done
+#也可以在退出时写个函数处理取消的信息
+
+
+接收一个参数做为文件名，找往里面写一个信息做为模板,最后一行为空白，并用vim打开，把光标放在最后一行
+#!/bin/bash
+#
+cat > $1 << EOF
+#!/bin/bash
+# Name: `basename $1`
+# Description:
+# Author: dubing
+# Version: 0.0.1
+# Datatime: `date '+%F %T'`
+# Usage: `basename $1`
+
+EOF
+vim +8 $1
+
+
+如果脚本没有内容写以上信息，有内容就直接打开，在退出时并验证语法
+#!/bin/bash
+#
+if ! grep "[^[:space:]]" $1 &> /dev/null; then
+ cat > $1 << EOF
+ #!/bin/bash
+ # Name: `basename $1`
+ # Description:
+ # Author: dubing
+ # Version: 0.0.1
+ # Datatime: `date '+%F %T'`
+ # Usage: `basename $1`
+
+EOF
+fi
+vim + $1
+until bash -n $1 &> /dev/null; do
+ read -p "Syntax error, q|Q for quiting, others for editing:" OPT
+ case $OPT in
+  q|Q)
+   echo "Quit."
+   exit 8 ;;
+  *)
+   vim + $1
+ esac
+done
+chmod +x $1
+
+
+getopts：可以使用bash脚本的参数信息，只可以使用短选项，不可以使用长选项，只可以获取一个选项
+里面有一个内置变量$OPTARG可以得到参数后的值；$OPTIND表示选项索引
+#!/bin/bash
+USAGE() {
+ echo "Usage: opttest.sh [-d argu] [-b argu]"
+}
+while getopts ":b:d:" SWITCH; do
+ case $SWITCH in
+  b) echo "The option is b." 
+   echo $OPTARG
+   echo $OPTIND;;
+  d) echo "The option is d."
+   echo $OPTARG
+   echo $OPTIND;;
+  *) USAGE;;
+ esac
+done
+可以接收多个参数，把每个参数都必须带值，但是所有选项都必须有参数
+
+
+
+
+如果脚本没有内容写以上信息，有内容就直接打开，在退出时并验证语法
+#!/bin/bash
+#
+while getopts ":d:" SWITCH; do
+ case $SWITCH in
+  d) DESC=$OPTARG ;;
+  \?) echo "Usage: use [-d DESCRIPTION] FILENAME" ;;
+ esac
+done
+shift $[$OPTIND-1]
+if ! grep "[^[:space:]]" $1 &> /dev/null; then
+ cat > $1 << EOF
+ #!/bin/bash
+ # Name: `basename $1`
+ # Description: $DESC
+ # Author: dubing
+ # Version: 0.0.1
+ # Datatime: `date '+%F %T'`
+ # Usage: `basename $1`
+
+EOF
+fi
+vim + $1
+until bash -n $1 &> /dev/null; do
+ read -p "Syntax error, q|Q for quiting, others for editing:" OPT
+ case $OPT in
+  q|Q)
+   echo "Quit."
+   exit 8 ;;
+  *)
+   vim + $1
+ esac
+done
+chmod +x $1
+
+
+
+写一个脚本getinterface.sh，脚本可以接受选项{i,I,a}，完成以下任务：
+使用以下形式：getinterface.sh [-i interface | -I IP | a]
+当用户使用-i选项时，显示其指定网卡的IP地址
+当用户使用-I选项时，显示其后面的ip地址所属的网络接口
+当用户单独使用-a选项时，显示所有网络接口及其ip地址(lo除外)
+#!/bin/bash
+SHOWIP() {
+ if ! ifconfig | grep -o "^[^[:space:]]\{1,\}" | grep $1 &> /dev/null; then
+  return 13
+ fi
+ echo -n "${1}:"
+ ifconfig $1 | grep -o "inet addr:[0-9\.]\{1,\}" | cut -d: -f2
+}
+SHOWETHER() {
+ if ! ifconfig | grep -o "inet addr:[0-9\.]\{1,\}" | cut -d: -f2 | grep $1 &> /dev/null; then
+  return 14
+ fi
+ echo -n "${1}:"
+ ifconfig | grep -B 1 "$1" | grep -o "^[^[:space:]]\{1,\}"
+}
+USAGE() {
+ echo "getinterface.sh <-i interface | -I IP>"
+}
+while getopts ":i:I:" SWITCH; do
+ case $SWITCH in
+  i)
+   SHOWIP $OPTARG
+   [ $? -eq 13 ] && echo "Wrong ehtercard."
+   ;;
+  I)
+   SHOWETHER $OPTARG
+   [ $? -eq 14 ] && echo "Wrong IP."
+   ;;
+  \?)
+   USAGE ;;
+ esac
+done
+
+
+
+
+VNC：虚拟网络计算，是一个协议；可以实现跨平台打开桌面
+登录vnc时用的用户是操作系统的用户，用的密码不是操作系统用户的密码
+
+
+
+
+
+yum install tigervnc-server   #安装vnc
+vncpasswd  #设定当前用户的访问密码
+vncserver &   #建议第一次启动时用这个命令  在当前用户的目录下会生成一个.vnc目录
+cd .vnc
+vim xstartup  #最后一行改为以下内容
+gnome-session &
+#退出重启vncserver
+vncserver -kill :2  #关闭第一个桌面
+vncserver -kill :1  #关闭第二个桌面
+vncserver &
+chkconfig vncserver on   #开机自动启动
+
+
+
+
+
+
+
+
+
+00:06:00

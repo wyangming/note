@@ -1,0 +1,408 @@
+linux用户及权限详解
+
+文件的权限依次是：
+	属主，属组，其他用户
+
+权限有三种：
+	r, w, x
+文件
+	r：可读，可以使用类似cat等命令查看文件
+	w：可写，可以编辑或删除此文件
+	x(eXacutable)：可执行，可以在命令提示符下当做命令提交给内核运行
+目录
+	r：可以对此目录执行ls以列出内部的所有文件
+	w：可以在此目录创建文件
+	x：可以使用cd命令切换进入此目录，也可以用ls -l查看内部文件的详细信息
+
+一般情况下不建议文件有x权限，但目录应该有
+
+rwx：
+	r--：只读
+	r-x：读和写权限
+	---：无权限
+
+0 000 ---：无权限
+1 001 --x：执行
+2 010 -w-：写
+3 011 -wx：写和执行
+4 100 r--：只读
+5 101 r-x：读和执行
+6 110 rw-：读写
+7 111 rwx：读写执行
+	
+	755：rwxr-xr-x
+	640：rw-r-----
+	660：rw-rw----
+
+一个八进制就可以表示一类用户的权限
+
+用户：UID, /etc/passwd
+组：GID, /etc/group
+
+影子口令：/etc/shadow
+
+用户类别：
+	管理员：管理员的id号永远为0
+	普通用户：id从1-65535
+		系统用户：id从1-499
+			专用于运行后台进程，用户是不需要登录系统的
+		一般用户：id从500-60000
+用户组：
+	管理员组：
+	普通组：
+		系统组：
+		一般组：
+用户组类别：
+	私有组：创建用户时没有指定用户所属的组，系统会自动为其创建一个与用户名同名的组
+	基本组：
+	附加组：用户基本组之外的组是附加组或者额外组
+
+/etc/passwd
+	account：登录名
+	password：密码
+	UID：
+	GID：
+	GECOS：用户的注释信息
+	HOMEDIR：家目录
+	SHELL：用户默认的shell
+
+/etc/shadow
+	account：登录名
+	encryted password：加密的密码
+
+加密方法：
+	对称加密：加密与解密使用两只一个密码
+	公钥加密：每一个密码都成对出现，一个为私钥(secret key)，一个为公钥(public key)。字是现代电子商务实现的基本设施。用于做密钥交换
+	单身加密：散列加密，由明文取密文，提取数据特征码，常用于数据完整性校验
+		特性：
+			雪崩效应：蝴蝶效应，初始条件的微小改变将会因起结果的巨大变化。
+			定长输出：无论数据多大都是一样的长度
+				MD5：Message Diget, 128位的定长输出
+				SHA1：Secure Hash Algorithm, 160位的定长输出
+		md5sum命令可以计算文件的特征码
+
+useradd USERNAME：添加用户，添加一个用户会在/etc/passwd里添加一行。用户属性的默认配置在/etc/default目录下的useradd文件里
+	用法：
+		useradd myusername
+
+groupadd GROUPNAME：添加一个组
+	用法：
+		groupadd mygroup
+
+用户管理命令：
+	useradd, userdel, usermod, passwd, chsh, chfn, finger, id, chage
+
+组管理命令：
+	groupadd, groupdel, groupmod, gpasswd
+
+权限管理命令：
+	chown, chgrp, chmod
+
+useradd [options] LOGINNAME
+	参数：
+		-u：指定UID，一定是其他用户尚未使用的ID号
+		-g：GID指定其基本组,是组名
+		-G：GID...，指定其额外组或附加组。是组名，可是加多个
+		-c："COMMENT"指定其注释信息
+		-d：/path/to/somedirectory指定某个目录为用户的家目录
+		-s：shell的路径，是在/etc/shells里的shells，为用户指定所用的shell。默认为bash
+		-m：强行为用户创建家目录
+		-k：把/etc/skel/目录下复制到用户的家目录下的
+		-M：不给用户创建家目录
+		-r：添加一个系统用户，系统用户不能登录用户，没有家目录。一般此选项单独使用
+	用法：
+		useradd -u 1000 user1  添加一个用户，设置UID为1000。如果没有给用户指定组则创建一个与用户名一样的组，且GID与UID保持一致。不同视为特殊用户
+		useradd -g mygroup user2 添加一个用户到mygroup组
+		useradd -G mygroup user3 添加一个用户把mygroup添加到附加组中
+		useradd -c "Tony Blare" -d /home/blare user4 添加一个用户，名为Tony Blare 家目录在/home/blare,登录名为user4
+		useradd -s /sbin/nologin user5 添加一个user5的用户指定shell为/sbin/nologin不让user5用户登录
+	在创建用户的时候UID是/etc/passwd中最后一个UID号加一
+
+环境变量
+	PATH
+	HISTSIZE
+	SHELL：用户默认的shell
+
+/etc/skel是他建用户时用户默认配置的文件
+/etc/login.def用户默认配置的一些信息
+
+userdel [options] USERNAME
+	如果删除用户没有指定任何选项，用户的家目录是不会被删除的
+	参数：
+		-r：删除用户的同时删除用户的家目录
+	用法：
+		userdel -r user1 删除user1及user1的家目录
+
+id：查看用户的账号属性信息，如果不跟用户名是当前用户的信息。否则显示相应的用户属性信息
+	参数：
+		-u：只看UID
+		-g：基本组的GID
+		-G：所有组的GID
+		-n：一般与-g,-n一块用显示组名与用户名
+
+finger USERNAME 查看用户账号相关信息
+	查看用户信息
+
+usermod：基本与useradd用法一致
+	参数：
+		-u：改用户的UID
+		-g：改用户的基本组
+		-G：改附加组，如果用户已经有附加组，则改后覆盖原有的附加组，如果要追加则用-a来用
+		-a：一般与-G选项一块用，用于追加附加组
+		-d：为用户指定新的家目录，如果用户已经登录过并且在家目录下创建过文件，则原来的文件不能访问。可用-m选项一块使用，把用户原家目录下的文件移动到新的家目录下
+		-m：一般与-d一块用，把用户原家目录下的文件移动到新的家目录下
+		-s：修改用户的shell
+		-l：改变用户的登录名
+		-e：指定过期时间格式年月日
+		-f：指定非活动时间
+		-L：锁定用户，类似于禁用
+		-U：解锁用户
+
+chsh：专用改用户shell
+	用法：
+		chsh user3
+
+chfn：修改用户的注释信息
+	用法：
+		chfn user3 
+
+finger：显示用户的注释信息
+
+密码管理
+passwd [USERNAME]：普通用户修改自己的密码，root可以修改其他用户的密码
+	参数：
+		--stdin：从标准输入接收信息
+		-l：锁定用户帐号
+		-u：解锁用户帐号
+		-d：删除用户密码
+	用法：
+		echo "redhat" | passwd --stdin user3  修改user3的密码
+
+linux尽量避免与用户交互
+
+pwck(passwd check)：检查用户帐号完整性
+
+组管理：
+
+groupadd：创建组
+	参数：
+		-g：指定GID，不指定是大于500的值。还需从上一个组的id往上加1
+		-r：添加一个系统组，一般单独使用，系统用户没有家目录
+		-s：指定shell
+
+groupmod：修改组
+	参数：
+		-g：GID
+		-n：修改组名
+
+groupdel：删除一个组
+
+gpasswd：给组加密码，在切换用户基本组的时候需要输入密码，如果知道密码则可以切换过去
+
+newgrp：切换用户的基本组为另外一个组，用户原来附加组有要切换的组是不需要密码的，只有跟所切换用户没关系的组时才需要密码，也可以用exit用来退出所切换的组
+
+chage：改变用户密码过期信息
+	参数：
+		-d：指定密码最后一次的修改时间格式年月日
+		-E：用户帐号的过期时间
+		-I：非活动时间
+		-m：最短使用时间
+		-M：最长使用时间
+		-W：警告时长
+
+
+文件的权限
+	三类用户：
+		u：属主
+		g：属组
+		o：其它用户
+
+chown：改变文件属主(只有管理员才有这样的权限)
+	chown USERNAME	file,...  改变文件的属主为username，如果改目录的话里面的文件不会改
+	参数：
+		-R：修改目录及内部文件的属主
+		--reference：--reference=/path/to/somefile file...把文件的属主修改为与/path/to/somefile的属主一样
+	用法：
+		chown hadoop /tmp/abc  改变/tmp/abc文件的属主为hadoop
+		chown -R hadoop /tmp/hi  改变/tmp/hi目录下所有文件的属主为hadoop
+		chown --reference=/tmp/abc /tmp/test  把/tmp/test文件的属主属组修改为与/tmp/abc的属主属组一样
+	
+	chown即可以改属主也可以改属组
+		chown USERNAME:GROUPNAME file...  改属主与属组，也支持-R选项
+		chown :GROUPNAME file...  改属组，也支持-R选项
+		chown USERNAME.GROUPNAME file...  改属主与属组，也支持-R选项
+
+chgrp(change group)：修改文件属组，用法跟chown用法一样
+	chgrp GRPNAME file,...
+	参数：
+		-R：同chown
+		--reference：同chown
+	用法：
+		chgrp mygroup /tmp/abc  把/tmp/abc的属组修改为mygroup
+
+chmod:修改文件的权限   可以同时改三类权限，也可以只改某一类用户的权限，也可以只改某一类用户的某一位权限或者某些位权限
+	修改三类用户的权限：
+		chmod 加三个八进制权限
+		chmod MODE file
+			-R：修改目录及内部文件的所有权限
+			--reference：--reference=/path/to/somefile file,...
+		用法：
+			chmod 750 /tmp/abc 修改/tmp/abc文件的权限为750
+			chmod 75 /tmp/abc 其实为075
+			chmod 5 /tmp/abc 其实为005
+			chmod --reference=/tmp/test /tmp/abc
+		
+	修改某类用户或某些类用户的权限：
+		三类用户是u, g, o, a。不支持8进制
+		修改某一类：
+			chmod 用户类别=MODE file,...
+			chmod 用户类别=MODE,用户类型=MODE file,...  只有两类权限不一样的时候才用,隔开
+			chmod 用户类别用户类别=MODE file,...
+		用法：
+			chmod u=rwx /tmp/abc
+			chmod u=rw /tmp/abc
+			chmod u=r,g=w /tmp/abc
+			chmod ug=rw /tmp/abc
+			chmod g=rw,o= /tmp/abc
+			
+	修改某类用户的某位或某些位权限：
+		三类用户u, g, o, a
+		chmod 用户类别+|-MODE file,...修改一类用户权限
+		chmod 用户类别+|-MODE,用户类别+|-MODE file,...
+		用法：
+			chmod u-x /tmp/abc 把/tmp/abc下的属主的执行权限去掉
+			chmod u-x,g+x /tmp/abc
+			chmod a+x /tmp/abc 三类用户权限都加上执行权限
+			chmod -x /tmp/abc 三类用户权限都去掉执行权限
+			chmod u-wx /tmp/abc
+
+bc：计算器
+	在里面直接写完后敲回车
+	scale=2可以保留两位精度的小数
+	quit退出
+
+openssl
+	openssl passwd  后如果输入两次密码可以生成一个密码串
+	参数：
+		-1：指定加密算法
+		-salt：可以加点杂志即盐
+	用法：
+		openssl passwd -1 -salt '1234234'   回车后再输入密码就可以生成一个密码串
+
+linux内在法则文件默认是不可以有执行权限的
+
+umask：遮罩码
+	管理员的为：0022一般只看后三位022
+	普通用户为：0002一般只看后三位002
+	用于后三位计算默认的创建文件与目录的权限
+		创建文件用666-umask
+		创建目录用777-umask
+	文件默认没有执行权限，如果算行的结果有执行权限，则将其权限加1
+	如果创建的文件不想让其他用户访问可以umask 027来修改用户umask的值
+
+shell的登录类型：
+	登录式shell
+		当用户通过某终端登录的shell
+		用su命令切换过去的，如：
+			su - USERNAME
+			su -l USERNAME
+	非登录式shell
+		su USERNAME 没有加-与-l的
+		在图形图端中打开的
+		自动执行的shell脚本
+	
+	bash配置文件
+		合局配置
+			配置文件：/etc/profile, /etc/profile.d/*.sh, /etc/bashrc
+		个人配置
+			在用户的家目录下：~/.bash_profile, ~/.bashrc
+			
+	profile类的配置文件
+		设置环境变量：如果冲突的话以个人配置的为准,越是范围小的最终生效
+		运行命令或脚本：用户全录
+	bashsrc类的文件
+		用来设定本地变量
+		定义命令别名
+
+登录式shell如何读取配置文件
+	/etc/profile --> /etc/profile.d/*.sh --> ~/.bash_profile --> ~/.bashrc --> /etc/bashrc
+
+非登录式shell如何读取配置文件
+	~/.bashrc --> /etc/bashrc --> /etc/profile.d/*.sh
+	su USERNAME
+
+bash：脚本解释器
+
+机算机五大部件
+	运算器、控制器-->cpu
+	存储器RAM
+	输入设备/输出设备
+	
+	程序由指令和数据组成。
+	
+	整个计算过程是由运算器完成
+	控制器：指令
+	运算器：
+	存储器：
+	
+	地址总线：内在寻址
+	数据总线：传输数据
+	控制总线：控制指令
+	
+	寄存器：CPU暂时存储器
+	I/O：硬盘，键盘，鼠标
+	
+	程序
+		INPUT设备
+		OUTPUT设备
+		
+	系统设定：
+		默认输出设备：标准输出，STDOUT, 1, 用于输出程序的正常输出结果
+		默认输入设备：标准输入，STDIN, 0, 
+		标准错误输出：STDERR, 2
+	
+	标准输入：默认键盘
+	标准输出和错误输出：默认显示器
+	
+	I/O重定向：改变数据输入输出来源
+
+Linux的I/O重定向需要用符号一完成
+	>：输出重定向：但是目标会被覆盖掉如果想何留文件原有内容可用>>来追加输出
+		ls /var > /tmp/var.out 把用ls查询/var目录的信息输出到/tmp/var.out文件里
+		ls /var >> /tmp/var.out 把用ls查询/var目录的信息追加到/tmp/var.out文件里
+	set：是bash的一个内建命令
+		参数：
+			-C：可用+与-来禁用与启用对已经存在文件使用覆盖重定向操作
+		用法：
+			set -C 关闭对已经存在文件使用覆盖重定向操作，如果关闭使用>|来进行强制覆盖
+			set +C 启用对已经存在文件使用覆盖重定向操作
+	2>：重定向错误输出
+	2>>：以追加的方式实现重定向错误输出
+		用法：
+			ls /varr >/tmp/var3.out 2> /tmp/err.out  错误与正确都重定向
+			ls /varr >/tmp/var3.out 2> /tmp/var3.out  错误与正确都重定向到同一文件里
+	&>：重定向标准输出与错误输出致同一个文件
+	
+	<：输入重定向
+		用法：
+			tr 'a-z' 'A-Z' < /etc/fstab  用/etc/fstab代替输入
+	<<：Here Document此处文档
+		cat << END  回车后会输入字符，但当输入END时结束，打印输入的字符，没有END。这里END是文档结束符
+		cat << END  同上
+		cat >> /tmp/myfile.txt << EOF  用户从键盘输入的数据追加到/tmp/myfile.txt文件里
+
+管道：把前一个命令的输出，作为后一个命令的输入
+	命令1 | 命令2 | 命令3 ...
+	用法：
+		echo "Hello world." | tr 'a-z' 'A-Z'   把Hello world.全部转换为大写
+		echo "redhat" | passwd --stdin hive   修改hive用户的密码为redhat
+		cut -d: -f1 /etc/passwd | sort   把/etc/passwd下的内容以第一个列进行排序
+		cut -d: -f1 /etc/passwd | sort | tr 'a-z' 'A-Z'   把/etc/passwd下的内容以用户名排序后转为大写
+		ls /var | tr 'a-z' 'A-Z'
+
+linux重要哲学思想：组合小命令完成复杂任务
+
+tee：可以实现将一个命令结果即保存到文件中一份又输出到屏目上一份
+	用法：
+		echo "Hello world." | tee /tmp/hello.out   把Hello world.即输出到屏目也保存到/tmp/hello.out文件里
+		wc -l /etc/passwd | cat -d' ' f1   显示/etc/passwd有多少行

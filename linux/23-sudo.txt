@@ -1,0 +1,70 @@
+﻿sudo COMMAND
+
+某个用户能够以另外哪一个用户的身份通过哪些主机执行什么命令
+
+sudo的配置文件/etc/sudoers  这个文件的权限是440限-r--r-----一般不去编辑这个文件，编辑的话可能会有施法错误，导致系统崩溃，一般用visudo去管理
+
+/etc/sudoers里的每一行定义一个sudo条目
+who   #谁
+which_host=(runas) command    #能够在那些主机上，以什么人的身份， 运行什么命令
+
+一个sudo条目：
+who which_hosts=(runas) TAG: command    #可以在命令前添加标签
+NOPASSWD:  #定义的用户在执行的时候可以不输密码
+
+支持别名机制：
+Alias ::='User_Alias'  User_Alias (':',User_Alias)* |
+         'Runas_Alias' Runas_Alias (':' Runas_Alias)* |
+		 'Host_Alias'  Host_Alias (':' Host_Alias)* |
+		 'Cmnd_Alias'  Cmnd_Alias (':' Cmnd_Alias)*
+who:User_Alias
+which_host:Host_Alias
+runas:Runas_Alias
+command:Cmnd_Alias
+别名必须全部而且只能使用大写英文字母的组合，别名必须先定义再去使用
+别名遵循EBNF语法结构
+
+用户别名：
+User_Alias USERADMIN =
+ 用户的用户名
+ 组名，使用%引导
+ 还可以包含其它已经定义的用户别名，也就是说别名是可以嵌套别名的
+主机别名时可以用!号取反
+
+主机别名
+Host_Alias HOST = 
+ 主机名
+ IP
+ 网络地址
+ 其它主机名，也可以嵌套
+
+Runas_Alias:
+ 用户名
+ %组名
+ 其它的Runas别名
+
+Cmnd_Alias:
+ 命令路径，最好是绝对路径
+ 目录(此目录内所有命令)
+ 其他事先定义过的命令别名
+
+sudo 默认情况下当用户输入密码后，保存时长为5分钟
+sudo -k 让此前用户输入的所有密码失效
+sudo -l 列出当前用户可以以什么样的身份执行什么样的命令
+
+sudo命令
+ -l：列出当前用户可以使用的所有sudo类命令
+ -k：让认证信息失效
+
+sudo的日志文件 /var/log/messages, /var/log/secure
+ 
+例子：
+使用hadoop用户以管理员身份使用useradd usermod命令
+useradd hadoop
+passwd hadoop  #设置hadoop的密码
+visudo   #内容如下
+hadoop ALL=(root) NOPASSWD:/usr/sbin/useradd, PASSWD:/usr/sbin/usermod   #ALL是通配符表示所有NOPASSWD:表示用户执行sudo useradd不需要输入密码，sudo usermod需要输入密码
+或
+User_Alias USERADMIN=hadoop, %hadoop, %useradmin
+Cmnd_Alias USERADMINCMND=/usr/sbin/useradd, /usr/sbin/usermod, /usr/sbin/userdel, /usr/bin/passwd [A-Za-z]*, ! /usr/bin/passw root    #在执行passwd的时候不可修改root的密码，并在执行passwd的时候必须输入一个用户名，因为如果不输入则改的是root的密码
+USERADMIN ALL=(root) NOPASSWD: USERADMINCMND

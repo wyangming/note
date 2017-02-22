@@ -1,0 +1,749 @@
+﻿DNS：域名解析，BIND：Berkeley Internet Name Domain
+SSL/TLS：http-->https, OpenSSL, CA, Digital Certificate, PKI
+HTTP：HTTP协议，Apache, LAMP, Nginx(Engine X), LNMP(LEMP), MySQL, PHP, varnish
+CDN：DNS(View), varnish
+File Server：NFS、SMB/CIFS、FTP
+Netfilter：iptables(filter, nat, mangle, raw)、tcp wrapper
+NSSwitch：framework, platform, PAM
+SMTP/POP3/IMAP4：Mail Server
+SELinux：Security Enhanced Linux
+ C2-->SELinux-->B1
+
+MySQL：
+
+DNS：Domain Name Service(域名服务器)
+域名：www.f273c.com(主机名：FQDN：Full Qualified Domain Name, 完全限定域名)
+
+DNS：名称解析，Name Resolving名称转换(背后有查询过程，查询依赖的是数据库)
+名称解析过程是FQDN<-->IP，DNS转换是双向转换的
+
+nsswitch：为多种名称解析的平台，配置文件在/etc/nsswitch.conf
+
+能够将DNS转换成IP地址的解析机制有两个：libnss_files.so与libnss_dns.so
+
+host:  files  dns
+在nsswitch的配置文件里去找/etc/hosts文件
+
+从主机名到IP地址的转换是stub resolover：名称解析器
+
+当去ping www.f273c.com时ping命令会借助stub resolover来完成名称解析，stub resolover会先找/etc/hosts文件里有没有www.f273c.com对应的IP地址，如果没有就会找dns来解析
+
+早期主机名与IP是通过hosts文件记录格式：
+ IPADDR        FQDN           Ailases
+ 172.16.0.1    www.f273c.com  www
+
+名称地址管理机构(IANA)后来转交给ICANN(民间组织，IANA是美国国家的)
+
+IANA：负责维护IP与FQDN，早期是通过ftp下载hosts文件来覆盖本地的hosts文件
+早期主式：
+1、周期性任务
+2、后来建了个Server，后来数据爆炸性增长
+3、分布式数据库，从集中的数据库转换成了分步式数据库
+
+TLD：
+ 组织域：.com, .org, .net, .cc
+ 国家域：.cn, .tw, .hk, .iq, .ir, .jp
+ 反向域：IP-->FQDN
+  反向：IP-->FQDN  与正向的不是同一个数据库
+  正向：FQDN-->IP
+
+IP-->FQDN：可以有多个
+FQDN-->IP：可以有多个，DNS的高级功能
+
+查询：
+ 递归：只发出一次请求
+ 迭代：发出多次请求
+
+解析：
+ 正向：FQDN-->IP
+ 反向：IP-->FQDN
+
+两段式：递归，迭代
+
+DNS：分布式数据库
+ 上级仅知道其直接下级
+ 下级只知道根的位置
+
+DNS服务器：
+ 接受本地客户端查询请求(递归)
+ 外部客户端的请求：请求权威答案
+  肯定答案：TTL
+  速写作案：TTL
+ 外部客户端请求：非权威答案
+
+如果要访问互联网通常要编辑/etc/resolv.conf文件里的nameserver
+
+DNS服务器类型
+ 主DNS服务器：数据修改
+ 辅助DNS服务器：请求数据同步
+  serial number：定义版本号，从服务器发现版本号比主的小就更新
+  refresh：定义每隔多长时间检查一版本号
+  retry：重试时间，一般小于refresh
+  expire：过期时间
+  nagative answer TTL：否定答案的缓存时长
+ 缓存DNS服务器：不负责权威答案，只负责缓存答案
+ 转发器：不缓存只转发请求
+
+在DNS的数据库中的，每一个条目称作一个资源记录(Resource Record, RR)
+资源记录的格式：
+NAME           [TTL]            IN            RRT         VALUE
+www.f273c.com.                  IN            A           1.1.1.1
+1.1.1.1                         IN            PTR         www.f273c.com
+
+资源记录类型(RRT)：
+ SOA(Start Of Authority)：起始授权记录，用于标明一个区域内部，主从服务器之间如何同步数据，以及起始授权对象是谁的。这条记录必须在第一条
+  写法：
+   ZONE NAME   TTL   IN    SOA   FQDN   ADMINISTRATOR_MAILBOX   (
+														serial number
+														refresh
+														retry
+														expire
+														na ttl )
+  时间单位：M(分钟)、H(小时)、D(天)、W(周),默认单位是秒
+  邮箱格式：admin@f273c.com 改写为-->admin.f273c.com
+  f273c.com   600   IN   SOA  ns1.f273c.com.  admin.f273c.com.  (
+																2013040101 ; serial number
+																1H
+																5M
+																1W
+																1D)
+  ;号后面是注释或者写成
+  f273c.com   600   IN   SOA  ns1.f273c.com.  admin.f273c.com.  2013040101 1H 5M 1W 1D
+ NS(Name Server)：ZONE NAME --> FQDN
+  例子：f273c.com  600  IN  NS  ns1.f273c.com.
+        f273c.com  600  IN  NS  ns1.f273c.com.
+        ns1.f273c.com  600 IN   A   1.1.1.2
+		ns2.f273c.com  600 IN   A   1.1.1.5
+  以上每组必须成组出现
+ A(address)：FQDN-->IPV4  这个是最常用的记录
+ AAAA：FQDN-->IPV6
+ PTR(pointer)：IP-->FQDN   IP以是IPV4或者IPV6
+ MX(Mail eXchanger)：ZONE NAME --> FQDN
+  例子：
+   ZONE NAME    TTL    IN    MX  pri   VALUE
+   f273c.com.  600 IN MX 10  mail.f273c.com
+   mail.f273c.com  600 IN  A  1.1.1.3
+   pri优先级：0-99，数字越小级别越高，靠优先级区别主从
+ CNAME(Canonical NAME)：FQDN-->FQDN
+  www2.f273c.com   IN  CNAME    www.f273c.com
+ TXT
+ CHAOS
+ SRV
+
+站在DNS角度讲域是一个逻辑概念，区域是一个物理概念
+域：Domain
+区域：Zone
+
+.com
+f273c.com.     IN     NS     ns.f273c.com
+ns.f273c.com.  IN     A      192.168.0.10
+
+
+f273c.com.   192.168.0.0/24
+
+www     192.168.0.1
+mail    192.168.0.2, MX
+
+建立两个区域文件
+正向区域文件
+f273c.com.        IN      SOA    #无论正向反向第一条都是SOA，这里f273c.com.可以简写为@
+www.f273c.com     IN   A  192.168.0.1    #全写的时候一定得加.
+上面那条可以简写为
+www               IN   A  192.168.0.1    #简写的时候一定不可以加.
+
+反向区域文件
+0.168.192.in-addr.arpa.     IN  SOA      #反向区域文件是IP地址反过来写，不写主机那位
+1.0.168.192.in-addr.arpa.                IN  PTR   www.f273c.com.   #反射区域文件FQDN是不可以简写的
+上条可以简写为
+1     IN    PTR    www.f273c.com.
+
+MX记录只可以定义在正向文件中，NS记录正向反射都可以，A记录只可以定义在正向，PTR只可以定义在反向
+
+区域传送的类型：
+完全区域传送：axfr
+增量区域传送：ixfr
+
+区域类型：
+主区域：master
+从区域：slave
+提示区域：hint     #定义根在什么地方
+转发区域：forward
+
+
+DNS：BIND(DNS服务器软件)Berkeley Internet Name Domain
+BIND软件现在是由ISC来维护www.isc.org，他还维护着常用的软件Linux上的DHCP服务器
+
+bind介绍
+主配置文件/etc/named.conf
+ BIND进程的工作属性
+ 区域定义
+/etc/rndc.key(Remote Name Domain Controller)是一个密钥文件
+ BIND自身用的配置文件是/etc/rndc.conf
+区域数据文件(默认情况下是管理去/var/named目录下创建，名字自己定义)
+安装完成后有一个服务控制脚本/etc/rc.d/init.d/named
+ {start|stop|restart|status|reload(重读数据文件与配置文件)}
+bind本身运行的二进制程序是named
+bind-chroot：
+ 默认bind是运行在根下，named进程运行的用户与用户组都是named
+  所以把named进程运行所需要的文件都搬到/var/named/chroot/目录下去
+   etc/named.conf
+   etc/rdnc.conf
+   sbin/named
+   var/named
+  尽量不要chroot，也就是不要装bind-chroot软件包
+
+配置一个主DNS服务器，首先得配置为缓存名称服务器-->主DNS服务器-->从DNS服务器
+
+
+
+安装bind
+bind-utils给我们提供了很多工具一般在/usr/bin下有dig, host, nslookup, nsupdate这几个是非常常用的命令行工具，bind-libs是依赖的库文件
+如果已经安装了bind-libs bind-utils要先卸载
+rpm -e bind-libs bind-utils
+yum install bind-libs bind-utils
+yum install bind
+
+BIND配置文件
+/etc/named.conf   #主配置文件
+/etc/sysconfig/named  #服务脚本配置文件
+/usr/sbin/named   #主程序
+/usr/sbin/named-checkconf   #检查配置文件是否有语法错误
+/usr/sbin/named-compilezone  #检查区域文件是否有语法错误
+/usr/sibn/rndc   #远程控制工具
+/usr/sbin/rndc-contgen  #生成/etc/rndc.conf的配置文件
+
+/var/named/named.ca里面是13个常用的DNS服务器地址，如果没有这个文件可以用命令生成
+dig：Domain Information Gropher
+dig -t NS .     #查询所有根节点服务器
+
+/var/named/named.localhost  将localhost解析到127.0.0.1实现本地主机的反向解析
+
+/var/named/named.loopback   将127.0.0.1解析为localhost实现本地主机的正向解析
+
+DNS：
+监听的协议及端口：
+ 53/udp：一般用的是udp
+ 53/tcp：从服务器到主服务器之间传输数据的时候会用到tcp的53号端口
+ 953/tcp：是rndc监听的，远程域名服务器控制器
+
+/etc/named.conf配置 
+区域：
+zone "ZONE NAME" IN {
+ type {master|slave|hint|forward};
+};
+如果是主区域：
+file "区域数据文件";
+从区域：
+file "区域数据文件";
+masters { master1_ip; master1_ip; };
+
+/etc/named.conf配置如下
+mv /etc/named.conf /etc/named.conf.orig
+vim /etc/named.conf   内容如下
+options {
+	directory	"/var/named";
+};
+
+zone "." IN {
+	type hint;
+	file "named.ca";
+};
+
+zone "localhost" IN {
+	type master;
+	file "named.localhost";
+};
+
+zone "0.0.127.in-addr.arpa" IN {
+	type master;
+	file "named.loopback";
+};
+
+named-checkconf    #检查是否有语法错误
+named-checkzone "." /var/named/named.ca   #装载区域
+named-checkzone "localhost" /var/named/named.localhost
+named-checkzone "0.0.127.in-addr.arpa" /var/named/named.loopback
+service named restart    #在Centos7里已经用systemctl restart  named.service代替
+
+临时性的关闭SELinux
+getenforce  #查看现在是什么状态 Enforcing表示处于工作状态需要用闭关
+setenforce 0  #关闭
+setenforce 1  #启用
+永久关闭需要编辑/etc/selinux/config把SELINUX=enforcing值改为permissive或者disabled，一般用permissive，如果是disabled启动会有问题
+
+dig -t NS .   #测试一下根服务器
+ping www.baidu.com   #测试一下是否可以上互联网
+
+dig -t RT NAME   #-t指定资源记录类型 NAME代表查的是那个名称
+dig -t RT NAME @IP   #直接去指定的IP上查找资源记录
+dig -x IP     # 根据IP查找FQDN
+例子： dig -t NS f273cc.com
+dig -t NS f273cc.com @192.168.1.152
+
+host -t RT NAME   #也可查询名称的解析结果，查询出的结果比dig简单的多
+例子：host -t A www.f273cc.com
+host -t NS f273cc.com
+host -t MX f273cc.com
+host -t SOA f273cc.com
+
+nslookup是一个交互是命令，windows也支持
+server IP  # 切换DNS服务器
+set q=RT  # 设置查询资源类型
+NAME  # 查询内容
+例子：
+server 192.168.1.152   # 把DNS服务器切换到192.168.1.152 server是用来切换DNS服务器
+set q=A   # 设置要查询的资源类型
+www.f273cc.com
+set q=NS
+
+假设有一个域名f273cc.com 192.168.1.0/24
+ns    192.168.1.152
+www   192.168.1.152, 192.168.1.104
+mail  192.168.1.152
+ftp   www
+
+添加一个区域解析在/etc/named.conf
+zone "f273cc.com" IN {
+        type master;
+        file "f273cc.com.zone";
+};
+在/var/named目录下建立文件 vim f273cc.com.zone  内容如下
+
+$TTL 600   # 定义一个TTL的宏
+@                       IN              SOA             ns1.f273cc.com.         admin.f273cc.com. (      # @表示直接引用区域定义的名称
+                                                                                2016031001
+                                                                                1H
+                                                                                5M
+                                                                                2D
+                                                                                6H )
+                        IN              NS              ns1     # 当第一个跟上一条一样的时候可以不用写
+                        IN              MX 10           mail
+ns1                     IN              A               192.168.1.152
+mail                    IN              A               192.168.1.152
+www                     IN              A               192.168.1.152
+www                     IN              A               192.168.1.104
+ftp                     IN              CNAME           www
+
+chmod 640 f273cc.com.zone
+chown root:named f273cc.com.zone
+named-checkzone "f273cc.com" /var/named/f273cc.com.zone   # 查检是否
+systemctl start named.service  # 重启服务
+dig -t NS f273cc.com   # 查找f273cc.com的DNS服务器
+dig -t NS f273cc.com @192.168.1.152   # 直接去192.168.1.152服务器上查找f273cc.com的DNS服务器
+dig -t A www.f273cc.com   # 查找A记录的值，如果www.f273cc.com主机有两个的话，会轮流应答请求，可以ping www.f273cc.com多次看到效果
+反射区域配置，在/etc/named.conf里添加如下信息
+zone "1.168.192.in-addr.arpa" IN {
+        type master;
+        file "192.168.1.zone";
+};
+添加/var/named/192.168.1.zone文件内容如下
+$TTL 600
+@                       IN              SOA             ns1.f273cc.com.         admin.f273cc.com. (
+                                                                                2016031001
+                                                                                1H
+                                                                                5M
+                                                                                2D
+                                                                                6H )
+                        IN              NS              ns1.f273cc.com.
+152                     IN              PTR             ns1.f273cc.com.
+152                     IN              PTR             www.f273cc.com.
+104                     IN              PTR             www.f273cc.com.
+named-checkzone "1.168.192.in-addr.arpa" 192.168.1.zone  #检查语法
+chown root:named 192.168.1.zone
+systemctl restart named.service
+dig -x 192.168.1.152   # 也可以用nslookup交互命令进行查询
+
+axfr：完全区域传送
+ixfr：增量区域传送
+
+/etc/named.conf说明
+options：
+recursion yes;   # 是否允许递归
+allow-recursion { 192.168.1.0/24; };  # 只跟192.168.1.0这个网段的用户递归
+allow-query {  };   #定义只允许谁来查询
+allow-transfer { 192.168.1.104 } ;   # 设定只可以允许谁来传送，也以加到zone里代表只可以传送这个zone的数据
+notify yes;    # 启动通知从服务器功能
+具体/etc/named.conf内容如下
+options {
+        directory       "/var/named";
+        allow-recursion { 192.168.1.0/24; 127.0.0.1; };  #  让192.168.1.0这个网段与127.0.0.1可以递归查询
+};
+
+zone "." IN {
+        type hint;
+        file "named.ca";
+};
+
+zone "localhost" IN {
+        type master;
+        file "named.localhost";
+		allow-transfer { none; };   # localhost不需要传送
+};
+
+zone "0.0.127.in-addr.arpa" IN {
+        type master;
+        file "named.loopback";
+		allow-transfer { none; };   # 0.0.127.in-addr.arpa不需要传送
+};
+
+zone "f273cc.com" IN {
+        type master;
+        file "f273cc.com.zone";
+		allow-transfer { 192.168.1.104; };   # 只允许192.168.1.104传送
+};
+
+zone "1.168.192.in-addr.arpa" IN {
+        type master;
+        file "192.168.1.zone";
+		allow-transfer { 192.168.1.104; };   # 只允许192.168.1.104传送
+};
+
+dig +recurse -t A www.sohu.com @192.168.1.152  # 以递归的方式在192.168.1.152这个DNS服务器上查找www.sohu.com
+dig -t A www.sohu.com @192.168.1.152    # 默认也是递归的
+dig +norecurse -t A www.sohu.com @192.168.1.152   # 不以递归方式在192.168.1.152这个DNS服务器上查找www.sohu.com
+dig +trace -t A www.baidu.com @192.168.1.152  # +trace可以跟踪显示整个DNS查询的过程
+dig -t axfr f273cc.com   #得到f273cc.com区域内的所有数据
+dig -t IXFR=2016031001 f273cc.com  # 手动完成区域传送
+dig -t axfr f273cc.com @192.168.1.152  #在192.168.1.104上向192.168.1.152获取dns数据
+
+配置DNS从服务器
+先在从服务器上安装上bind
+然后在主服务器上的zone(区域)文件里加上这个从服务器，当新增一台NS服务器的时候一定要加上
+安装完成后在/var/named/目录下跟主服务器这个目录是一样的
+在同步时有两个方案，一个是把/var/named目录改为属组改为有写权限，另一个是把同步过来的文件放到/var/named/slaves目录下，一般都放到/var/named/slaves目录下
+setenforce 0  #关闭SELinux
+mv /etc/named.conf /etc/named.conf.orig    # 把原有文件备份一下
+vim /etc/named.conf内容如下
+options {
+	directory "/var/named";
+	allow-recurion { 192.168.1.152/24; };
+};
+zone "." IN {
+	type hint;
+	file "named.ca";
+};
+zone "localhost" IN {
+	type master;
+	file "named.localhost";
+	allow-transfer { none; };
+};
+zone "0.0.127.in-addr.arpa" IN {
+	type master;
+	file "named.loopback";
+	allow-transfer { none; };
+};
+zone "f273cc.com" IN {
+	type slave;    # 指定这个服务器是从服务器
+	file "slaves/f273cc.com.zone";
+	masters { 192.168.1.152; };    #指定主服务器是那个
+	allow-transfer { none; };    #当这个服务器是一个从服务器时，设定这个服务器不是其他服务器的主服务器
+};
+zone "1.168.192.in-addr.arpa" IN {
+	type slave;    # 如果只设置本服务器为正向的从服务器则值为master,否则为slave。正向反向可以相互为主从
+	file "slaves/192.168.1.zone";
+	masters { 192.168.1.152 };
+	allow-transfer { none; };
+};
+named-checkconf  #检查语法错误
+chgrp named /etc/named.conf
+systemctl start named.service  # 启动服务
+这个时候可以看一下192.168.1.152服务器下的日志tail /var/log/messages看是否同步
+也可以看一个从服务器的日志tail /var/log/messages看是否传送成功
+cd /var/named/slaves文件看文件是否同步过来
+
+rndc：控制DNS服务器
+rndc-confgen > /etc/rndc.conf   # 生成配置文件放到/etc/rndc.conf
+vim /etc/rndc.conf
+把127.0.0.1改为192.168.152
+定位到# key "rndc-key" {这一行然后在末行模式下输入
+:.,$-1w >> /etc/named.conf
+vim /etc/named.conf
+定位到# key "rndc-key" {这一行然后在末行模式下输入
+:.,$s/^# //g
+把127.0.0.1改为192.168.1.152
+装完rpm包bind会生成一个/etc/rndc.key文件需要删除
+然后重启named服务
+rndc -c /etc/rndc.conf status   # 查看named服务状态
+rndc -c /etc/rndc.conf notify "f273cc.com"  #手动通知一下f273cc.com这个区域，完成命令后查看tail /var/log/messages查看通知的结果
+rndc -c /etc/rndc.conf flush    # 清空缓存
+rndc -c /etc/rndc.conf stop   #停止服务器
+rndc stop   # 直接会去读/etc/rndc.conf文件
+
+/etc/rndc.conf里复制到/etc/named.conf里的文字controls里的说明
+inet  # 监听的地址
+allow  # 允许谁来控制
+然后把/etc/rndc.conf文件复制到另一台主机
+然后切换到另一台主机编辑复制过来的rndc.conf把options里的default-server值改为192.168.1.152
+rndc -c /root/rndc.conf status
+
+一般不要开放rndc可以远程控制
+
+子域授权
+f273cc.com授权两个子域fin.f273cc.com与market.f273cc.com需要在f273cc.com区域文件里添加如下记录
+fin.f273cc.com. 				IN			NS		ns1.fin.f273cc.com.
+ns1.fin.f273cc.com.				IN			A		192.168.1.161
+
+market.f273cc.com.				IN 			NS		ns1.market.f273cc.com.
+ns1.market.f273cc.com.			IN			A		192.168.1.171
+
+若每个子域有两台或两台以上的DNS服务器则内容如下
+fin.f273cc.com. 				IN			NS		ns1.fin.f273cc.com.
+fin.f273cc.com. 				IN			NS		ns2.fin.f273cc.com.
+ns1.fin.f273cc.com.				IN			A		192.168.1.161
+ns2.fin.f273cc.com.				IN			A		192.168.1.162
+
+market.f273cc.com.				IN 			NS		ns1.market.f273cc.com.
+ns1.market.f273cc.com.			IN			A		192.168.1.171
+
+在192.168.1.152机子上给f273cc.com授权两个子域需要在f273cc.com的子域文件里添加如下信息
+fin				IN			NS		ns1.fin
+ns1.fin			IN			A		192.168.1.161
+
+market			IN			NS		ns1.market
+ns1.market		IN			A		192.168.1.171
+在保存之前把序列号加1
+
+切换到192.168.1.161服务器上编辑/etc/named.conf文件内容如下
+options {
+	directory "/var/named";
+};
+zone "." IN {
+	type hint;
+	file "named.ca";
+};
+zone "localhost" IN {
+	type master;
+	file "named.localhost";
+	allow-transfer { none; };
+};
+zone "0.0.127.in-addr.arpa" IN {
+	type master;
+	file "named.loopback";
+	allow-transfer { none; };
+};
+zone "fin.f273cc.com" IN {
+	type master;
+	file "fin.f273cc.com.zone";
+};
+# 下面定义的是一个转发域
+zone "f273cc.com" IN {	# 以下两行如果写在options里则是把所有的解析转发给父域。写在这里表示的是当解析的是父域的时候就转发给父域
+	forward first;  # only如果本DNS服务解析不了的，都转发给指定的DNS服务器，first先转发到指定的DNS服务器，如果指定的也解析不了就去找根
+	forwarders { 192.168.1.152 };  # 指定转发给那个服务器
+};
+保存退出
+先只做正向的
+cd /var/named目录
+新建文件
+vim fin.f273cc.com.zone内容如下
+$TTL 600
+@                       IN              SOA             fin.ns1.f273cc.com.     admin.fin.f273cc.com. (
+                                                                                2016031001
+                                                                                1H
+                                                                                5M
+                                                                                2D
+                                                                                6H )
+                        IN              NS              ns1
+						IN				MX 10			mail
+ns1                     IN              A             	192.168.1.161
+mail                    IN              A             	192.168.1.161
+www                     IN              A	            192.168.1.161
+保存退出
+systemctl start named.service  # 启动服务
+dig -t A www.fin.f273cc.com @192.168.1.161
+dig -t NS fin.f273cc.com @192.168.1.161
+换到192.168.1.152服务器上测试
+dig -t NS fin.f273cc.com @192.168.1.152
+
+allow-recursion {  };  # 如果允许递归查询的客户端比较多的话，还不在同一个网段，这个时候就需要用到acl
+named.conf里支持acl  acl  ACL_NAME以下是例子：
+acl innet {   #如果名字中间有空隔的话要用引号引起来
+	192.168.1.0/24;
+	192.168.2.0/24
+};
+options {
+	directory "/var/named";
+	allow-recursion { innet; };
+};
+
+named.conf内置有两个常用列表，none表示什么都没有，any表示所有
+
+DNS视图(View)：
+/etc/named.conf定义视图
+view VIEW_NAME {
+	# 这里所有的内容都为视图在options内所有的指令在视图中都可以使用，除了directory这样的指令
+};
+一但定义了视图所有的区域都必须定义在视图中
+
+视图例子：
+vim /etc/named.conf内容如下
+options {
+	directory "/var/named";
+	allow-recurion { 192.168.1.152/24; };
+};
+view telecom {
+	match-clients { 192.168.1.0/24; };   #定义访问来源
+	zone "f273cc.com" IN {
+		type master;
+		file "telecom.f273cc.com.zone";   #在这个文件里定义的结果为电信的
+	};
+	zone "a.net" IN {     #当a.net不想区分电信与网通的时候每个视图里都要写一份，指向同一个文件即可
+		type master;
+		file "a.net.zone";
+	};
+};
+view unicom {
+	match-clients { any; };   #只要没有被telecom匹配到都用这个网络
+	zone "f273cc.com" IN {
+		type master;
+		file "unicom.f273cc.com.zone";   #在这个文件里定义的结果为联通的
+	};
+	zone "a.net" IN {     #当a.net不想区分电信与网通的时候每个视图里都要写一份，指向同一个文件即可
+		type master;
+		file "a.net.zone";
+	};
+};
+cd /var/named/
+vim telecom.f273cc.com.zone   #内容如下：
+$TTL 43200
+@			IN			SOA			ns1.f273cc.com.			admin.f273cc.com. (
+													2013040201
+													1H
+													10M
+													7D
+													1D)
+			IN			NS			ns1
+			IN			MX 10		mail
+ns1			IN			A			172.16.100.1
+mail		IN			A			172.16.100.2
+www			IN			A			172.16.100.3
+保存退出
+chgrp named telecom.f273cc.com.zone
+chmod 640 telecom.f273cc.com.zone
+cp -p telecom.f273cc.com.zone unicom.f273cc.com.zone
+vim unicom.f273cc.com.zone  #内容如下
+$TTL 43200
+@			IN			SOA			ns1.f273cc.com.			admin.f273cc.com. (
+													2013040201
+													1H
+													10M
+													7D
+													1D)
+			IN			NS			ns1
+			IN			MX 10		mail
+ns1			IN			A			172.16.100.1
+mail		IN			A			192.168.0.16
+www			IN			A			192.168.0.17
+保存退出
+vim a.net.zone   #内容如下
+$TTL 43200
+@			IN			SOA			ns1.a.net.			admin.a.net. (
+													2013040201
+													1H
+													10M
+													7D
+													1D)
+			IN			NS			ns1
+ns1			IN			A			172.16.100.1
+www			IN			A			172.16.100.1
+保存退出
+chgrp named a.net.zone
+chmod 640 a.net.zone
+systemctl restart named.service  # 重启动服务
+
+互联网上免费的dns服务商：dnspod, www.dns.la
+
+利用Bind DLZ MySQL 构建智能DNS可以实现bind与数据库结合，不过页面功能得自己写。也可以用bind-sdb来实现与数据库结合
+
+一般不建立dns服务器记录日志，因为dns会很忙，如果访问一次产生一次io会降低系统效率
+
+添加日志功能
+vim /etc/named.conf 简单的方法只需要在options里加一句话如下
+querylog yes;
+重启dns服务即可
+systemctl restart named.service
+可用命令查看
+tail /var/log/messages
+
+DNS日志
+
+category：日志源
+ 查询
+ 区域传送
+ 
+ 可能通过catagory自定义日志来源
+
+channel：日志保存位置
+ syslog：系统的日志文件
+ file：自定义保存日志信息的文件
+
+dns日志
+logging {
+	channel my_file {
+		file "log.msgs" versions 3 size 10K;   # 日志文件是log.msgs，大小为10k 超过10k滚动 最多三个版本
+		severity dynamic;   # 日志级别定义为dynamic
+	};
+	channel my_syslog {
+		syslog local0;   # 用系统日志保存到local0里面
+		severity info;   #
+	};
+	category xfer-in { my_file; };    #传入的日志用my_file
+	category update { my_syslog; };   #更新日志用my_syslog
+};
+
+定义日志信息
+vim /etc/named.conf 添加loggin日志
+logging {
+	channel query_log {
+		file "/var/log/named/bind_query.log" versions 5 size 10M;   #日志文件的目录的属级属主一定要是named
+		severity dynamic;
+		print-category yes;
+		print-time yes;   #打印时间
+		print-severity yes;   #记录日志级别
+	};
+	channel xfer_log {
+		file "/var/log/named/transfer.log" versions 3 size 10k;
+		severity debug 3;
+		print-time yes;
+	};
+	category query { query_log; };  #查询相关的日志
+	category xfer-out { xfer_log };  #跟传出的日志相关
+};
+mkdir /var/log/named
+chown named:named /var/log/named
+chmpd 770 /var/log/named/
+named -checkconfig  # 检查文件格式
+systemctl restart named.service  # 重启日志
+
+一般查询日志与安全日志不开启
+跟更新相关的日志应该开启
+
+queryperf：可以对dns服务器进行压力测试
+queryperf默认没有安装需要手动安装
+找与系统bind相应的源码包解压进入目录
+bind-9.2.6/contrib/queryper
+./configure
+make
+不用安装直接把queryperf文件复制到/bin目录下就可以
+
+queryperf用法
+创建文件vim test内容如下，以下的内容可以多复制，可以复制到内千条
+www.f273cc.com A   # 查询的记录内容   查询什么样的记录
+保存退出
+queryperf -d test -s 192.168.1.152   #指定test文件用DNS服务器192.168.1.152来查
+tail /var/log/named/bind_query.log   #bind的查询日志，在上面定义的
+
+dnstop：监控dns服务器
+下载源码包解压安装后进入目录下
+安装依赖软件
+yum install libcap-devel
+yum install libpcap-devel
+./configure
+make
+make install
+
+dnstop用法
+dnstop -4 -Q -R eth0   # 指定IP类型  记录查询数   记录响应数   指定网卡
+
+dnstop是个抓包工具会阻断访问
+
+dns关闭查询日志后会提高很多

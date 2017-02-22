@@ -1,0 +1,252 @@
+linux网络配置
+
+IPv4点分十进制：
+0000 0000 - 1111 1111
+0-255
+
+网络地址：
+主机地址：
+
+端口用来标识进程与进程之间的通信
+ip与端口绑定就是socket套节字
+
+32位二进制
+
+
+A类：255.0.0.0， 8长度的掩码
+	0 000 0001 - 0 111 1111
+	127个A类，127用于回环，1-126
+	2^7-1个A类网
+	容纳多少个主机：2^24-2
+	主机位全0：网络地址
+	主机位全1：广播地址
+B类：255.255.0.0， 16长度的掩码
+	10 00 0001 - 10 11 1111
+	128-191
+	64个B类网络，2^14B类网
+	容纳多少个主机：2^16-2
+C类：255.255.255.0， 24长度的掩码
+	110 0 0000 - 110 1 1111
+	192-223
+	23个C类地址
+	2^21个C类网
+	容纳多少个主机：2^8-2
+D类：
+	1110 0000 - 1110 1111
+	224-239
+E类：
+
+TCP：三次握手，四次断开
+
+私有地址：
+	A类：10.0.0.0/8
+	B类：172.16.0.0/16-172.31.0.0/16
+	C类：192.168.0.0/24-192.168.255.0/24
+
+主机接入网络：
+
+IP：
+NETMASK：掩码
+GATEWAY：网关
+HOSTNAME：主机名
+DNS1：
+DNS2：
+DNS3：
+	手动指定：
+		DHCP(Dynamic Host Configuration Protocol)：跟IP地址相关
+
+路由
+
+Linux：网络属于内核的功能
+IP地址属于内核
+
+网卡定义：
+RHEL5：/etc/modprobe.conf
+alias
+
+RHEL6：/etc/udev/rules.d/70-persistent-net.rules
+
+以太网：ethX
+
+ifconfig：实现网络配置的命令
+	参数：
+		-a：显示所有接口的配置信息
+
+ifconfig ethX IP/MASK [up|down]
+	up或down启用或禁用网卡
+		配置的地址立即生效，但重启网络服务或主机，都会失效
+例子：
+ifconfig eth1 10.1.1.1/8
+ifconfig eth1 down
+ifconfig eth1 up
+ifconfig eth1 192.168.10.123/24
+
+网络服务：
+RHEL5：	/etc/init.d/network {start|stop|restart|status}
+RHEL6：	/etc/init.d/NetworkManager {start|stop|restart|status}
+	在6上manager不可以使用集群，建议停掉manager还用network
+
+网关：
+route：管理路由
+	add：添加路由
+		-host：主机路由
+		-net：网络路由
+			-net 0.0.0.0：默认路由
+		例子：
+			route add -net 10.0.0.0/8 gw 192.168.10.1 ：添加一个路由，下一跳是192.168.10.1
+			route ：可以查看路由表
+			route add default gw 192.168.1.1：添加默认路由
+	del：删除
+		-host
+		-net
+		例子：
+			route del -net 10.0.0.0/8 gw NEXTHOP：删除路由信息
+			route del -net 0.0.0.0：删除默认路由
+			route del default：删除默认路由
+	-n：以数字方式显示各主机或端口等相关信息
+		例子：
+			route -n
+route所做出的改动重启网络服务或主机后失效
+
+网络配置文件：
+/etc/sysconfig/network
+
+网络接口配置文件：
+/etc/sysconfig/network-scripts/ifcfg-INTERFACE_NAME
+DEVICE=：关联的设备名称，要与文件名称的后半部“INTEFACT_NAME”保持一致；
+BOOTPROTO={static|none|dhcp|bootp}：引导协议：要使用静态地址，使用static或none；dhcp表示使用DHCP服务器获取地址；
+IPADDR=：IP地址
+NETMASK=：子网掩码
+GATEWAY=：设定默认网关
+ONBOOT=：开机时是否自动激活此网络接口
+HWADDR=：硬件地址，要与硬件中的地址保持一致；可省；
+USERCTL={yes|no}：是否允许普通用户控制此接口；
+PEERDNS={yes|no}：是否在BOOTPROTO为dhcp时接受由DHCP服务器定的DNS地址；
+
+DEVICE=eth0
+TYPE=Ethernet
+UUID=6b290439-a386-4264-9f5e-bb7ea919024f
+ONBOOT=yes
+NM_CONTROLLED=yes
+BOOTPROTO=none
+HWADDR=00:15:5D:10:98:03
+IPADDR=172.16.16.173
+PREFIX=24
+GATEWAY=172.16.16.1
+NETMASK=255.255.255.0
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=yes
+IPV6INIT=no
+NAME="System eth0"
+
+不会立即生效，但重启网络服务或主机都会生效
+/etc/init.d/network restart重启网络服务
+
+
+配置路由在/etc/sysconfig/network-scripts/下添加route-ethX的文件：
+/etc/sysconfig/network-scripts/route-ethX
+添加格式一：
+DEST	via		NEXTHOP
+例子：
+	192.168.1.1/24	via	10.10.0.254
+
+添加格式二：
+ADDRESS0=
+NETMASK0=
+GATEWAY0=
+
+ADDRESS1=
+NETMASK2=
+GATEWAY3=
+……
+	例子：
+		ADDRESS0=192.168.1.1
+		NETMASK0=255.255.255.0
+		GATEWAY0=10.10.0.254
+两种格式不可以混合使用
+
+DNS服务器指定方法只有一种(最多有三个)：
+/etc/resolv.conf
+nameserver DNS_IP_1
+nameserver DNS_IP_2
+nameserver DNS_IP_3
+
+指定本地解析
+/etc/hosts
+主机IP	主机名	主机别名
+例子：
+	192.168.1.123	www.f273c.com	www
+DNS-->/etc/hosts-->DNS
+
+配置主机名：
+hostname HOSTNAME
+立即生效，但不是永久有效；
+/etc/sysconfig/network
+	这个文件也可以定义网观
+HOSTNAME=
+这样是永久有效的，重启网络服务不会影响主机名，重启主机才会。配置文件只能保证下次重启生效，可以用hostname改为配置文件里的名称
+/etc/sysconfig/network里：
+NETWORKING=yes|no 是否启用网络功能的开关
+/etc/sysconfig/network里也可以用GATEWAY来定义网关，当与网卡上冲突时以网卡为主
+
+RHEL5红帽的系统上：
+	setup：system-config-network-tui
+	system-config-network-gui
+		这种方式是修改配置文件的
+
+一个网卡可以使用多个地址：
+网络设备可以别名：
+eth0:
+	ethx:x, eth0:0, eth0:1,...
+
+配置方法：
+	ifconfig ethx:x IP/NETMASK
+	
+	/etc/sysconfig/network-scripts/ifcfg-ethx:x
+	DEVICE=ethX:X
+		非主要地址不能使用DHCP动态获取
+
+iproute2:
+ip：命令
+link：配置网络接口属性
+	show：查看网络接口的所有地址
+		例子：
+			ip -s link show
+	set：
+		ip link set DEV {up|down}
+		例子：
+			ip link set eth1 down：禁用eth1
+			ip link set eth1 up：启用eth1
+addr：协议地址
+	add：添加
+		ip addr add DEV
+		例子：
+			ip addr add 10.2.2.2/8 dev eth1
+			ip addr add 10.2.2.2/8 dev eth1 label eth1:1
+	del：删除
+		ip addr del ADDRESS dev DEV
+		例子：
+			ip addr del 10.2.2.2/8 dev eth1
+	show：查看
+		ip addr show dev DEV to PREFIX
+		例子：
+			ip addr show eth1 to 192.168.100/24：只显示某些信息
+			ip addr show eth1 to 10/8：只显示某些信息
+	flush：清除
+		ip addr flush dev DEV to 
+		例子：
+			ip addr flush eth1 to 10/8
+route：路由
+	-s：显示统计信息
+	add：添加路由
+		例子：
+			ip route add to 10.0.0.0/8 dev eth0 via 172.16.0.1
+	flush：
+		例子
+			ip route flush to 10/8
+
+
+
+
+
+

@@ -1,0 +1,134 @@
+raid及mdadm命令
+
+RAID：
+
+RAID LEVEL 级别：级别不代表性能的先进，仅代表磁盘组织方式不同，没有上下之分。
+在组合的时候不仅要考虑数据的速度，还要考虑数据的可用性
+
+条带速度快：如果有4块硬盘，1G的数据每块硬盘的丰256M的数据
+镜像保证数据的可用性：两块硬盘，1G的数据每一块上存1G
+
+RAID：0：条带
+	性能提升相当于一块盘的n倍(n是硬盘的个数)。读，写性能都提升
+	冗余能力(冗错能力)：无
+	空间为：100%
+	至少2块盘
+RAID：1：镜像
+	性能提升：写性能下降，读性能上升
+	冗余能力：有
+	空间为：50%
+	至少2块盘
+RAID：2
+RAID：3
+RAID：4：校验码技术：4块硬盘，前三块用于存储，第4块用于存校验码，当坏一块后可以计算出其盘内的数据。校验码盘只有一块，校验码盘访问量很大。存储用n-1块盘，1块盘用于校验码。只可以坏一块盘
+RAID：5：校验码技术：4块硬盘，每块盘依次轮流做为校验码，其他3块用于存储数据。只可以坏一块盘
+	性能表现：读写都提升
+	冗余能力：有
+	空间利用率：(n-1)/n
+	至少3块盘
+RAID：6：相当于用两块校验码盘，可以坏两块盘
+一般企业用的是：01
+	性能表现：读，写提升
+	冗余能力：有
+	空间利用率：50%
+	至少4块盘
+土豪用的是：10
+	性能表现：读，写提升
+	冗余能力：有
+	空间利用率：50%
+	至少4块盘
+50：
+	性能表现：读，写提升
+	冗余能力：有
+	空间利用率：(n-2)/n
+	至少6块盘
+
+jbod：将多个小盘组合成一个大盘来用；hadoop是最典型的例子。
+	性能表现：无
+	冗余能力：无
+	空间利用率：100%
+	至少2块盘
+
+
+
+mdadm：将任何块设备做成RAID
+
+逻辑RIAD：
+/dev/md#
+/dev/md0
+/dev/md1
+
+软raid的分区类型必须为fd即Linux raid auto
+
+模式化的命令：
+	创建模式：
+		-C
+			专用选项：
+				-l：级别
+				-n #：设备个数
+				-a {yes|no}：自动为其创建设备文件
+				-c：指定chunk大小，chunk默认是64k
+				-x #：指定空闲盘个数
+	管理模式：
+		[-a|--add]：添加一块磁盘，mdadm /dev/md# -a /dev/sda# 
+		--del, 
+		[-r|--remove]：移除一块硬盘, mdadm /dev/md# --r /dev/sda#
+		[-f|--fail|--set-faulty]：模拟损坏那个磁盘, mdadm /dev/md# --fail /dev/sda#
+	监控模式：
+		-F
+	装配模式：
+		-A
+	-D：用来显示指定raid设备的相关信息
+	--detail：用来显示指定raid设备的相关信息
+
+RAID0：
+	2G：
+		mdadm -C /dev/md0 -a yes -l 0 -n 2 /dev/sda{5,6}
+		mke2fs -j /dev/md0
+		mount /dev/md0 /mnt
+
+RAID1：
+	2G：
+		mdadm -C /dev/md1 -a yes -1 1 -n 2 /dev/sda7 /dev/sda8
+		mdadm -C /dev/md1 -a yes -1 1 -n 2 /dev/sda{7,8}：中间镜像有一个同步的过程
+		mke2fs -j /dev/md1
+		mount /dev/md1 /media/sdcard1
+		mdadm -D /dev/md1：查看RAID阵列md1的详细信息
+		mdadm --detail /dev/md1：查看RAID阵列md1的详细信息
+		mdadm /dev/md1 -f /dev/sda8 把阵列md1里的/dev/sda8磁盘模拟损坏
+		mdadm /dev/md1 -r /dev/sda8 把阵列md1里的/dev/sda8磁盘去掉
+		mdadm /dev/md1 -a /dev/sda9 把/dev/sda9磁盘添加到阵列md1里去。/dev/sda9必须跟之前的盘大小保持一致
+		
+/proc/mdstat：显示当前系统上所有用于启动状态的设备
+cat /proc/mdstat：显示当前系统上所有用于启动状态的设备
+
+停止阵列：
+	mdadm -S /dev/md#
+		--stop
+			停用一个阵列
+
+mdadm -A /dev/md1 /dev/sda7 /dev/sda9  ：把阵列md1重新装配起来
+
+watch：周期性的执行命令，并以全屏方式显示结果
+	参数：
+		-n：指定周期长度，默认单位为秒，默认为2
+	格式：
+		watch -n # 'COMMAND'
+	例子：
+		watch 'cat /proc/mdstat'
+
+将当前RAID信息保存至配置文件，以便以后进行装配
+mdadm -D --scan > /etc/mdadm.conf：把RAID写入配置文件里
+/etc/mdadm.conf：RAID主设备文件
+
+RAID5：
+	2G：3个1G
+
+mke2fs -j -E stride=16 -b 4096 /dev/md0	：指定条带大小, 条带是chunk比上block的倍数，chunk对RAID1有一定作用RAID5
+
+lsmod：列出模块
+
+mdadm：用户空间工具，管理工具。可以帮忙管理RAID，但RAID的工作靠的还是内核模块
+
+MD：meta device将多个底层的物理设备在内核中抽象出来成为逻辑设备，而后在dev提供个设备文件，从此后用这个设备文件接口来访问，在内核中所有的调配工作由MD模块来完成，近而能实现多个物理设备组合成一个逻辑设备
+	/dev/md#

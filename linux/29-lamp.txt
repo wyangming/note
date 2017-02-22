@@ -1,0 +1,1134 @@
+﻿apache：前期属于NCSA, httpd
+ A Patchy Server = apache
+
+ASF：Apache Software Foundation
+
+httpd:
+ Web Server, Open Source  开源的web服务器，目前官方主导的版本有三个2.4  2.2  2.0它们之间的功能与配置都有很大差别
+ 2.2主流  2.4最新的  2.0稳定   配置风格一样，支持参数、特性、运行特性有差别
+
+虚拟主机：
+  物理服务器
+  Web程序也只有一个
+  却可以服务多个不同的站点
+  
+客户端请求报文的格式：
+protocol://HOST:PORT/path/to/source
+  Method URL version
+  header
+  
+  body
+header与body之间的空行是必须要用的
+  GET /download/linux.tar.bz2 HTTP/1.0
+  Host：www.magedu.com
+如果只使用的ip地址则返回一个默认的虚拟主机
+ 
+httpd(特性):
+  事先创建进程：在程序运行的时候就已经创建进程
+  按需维持适当的进程：事先创建进程是有数量性要求
+  模块化设计，核心比较小，各种功能都通过模块添加：各个模块可以在运行时启用，支持运行配置，支持单独编译模块
+  支持多种方式的虚拟主机配置
+    Socket  IP:Port
+	虚拟主机的实现方式：
+	  基于IP的虚拟主机；
+	  基于端口的虚拟主机；
+	  基于域名的虚拟主机；
+  支持https协议 (mod_ssl)
+  支持用户认证
+  支持基于IP或主机名的ACL(访问控制机制)
+  支持每目录的访问控制(用户访问特定目录时需要输入用户名密码)
+  支持URL重写
+
+nginx：是多进程响应多用户请求的
+
+httpd安装方式：
+  rpm包：
+  源码编译：
+
+httpd:SELinux(事先让其处理permssive, disabled；getenforce可以查看；setenforce 0 设置成为permssive状态，如果想永久有效编辑/etc/sysconfig/selinux或者/etc/selinux/config(两个是同一个文件)把SELINUX值改为permissive)
+
+httpd：
+  /usr/sbin/httpd(MPM：prefork)  执行脚本
+    httpd: root, root   这是一个主导进程(master process)
+	httpd: apache, apache  在linux上小于1024的进程只有管理员才能用，这个是工作进程(worker process)
+  /etc/rc.d/init.d/httpd  启动脚本
+  Port(端口): 80/tcp, ssl: 443/tcp
+  /etc/httpd：工作要目录 进程的要目录，相当于程序安装目录
+  /etc/httpd/conf：配置文件目录
+    主配置文件：httpd.conf
+	/etc/httpd/conf.d/*.conf  所有的子配置文件
+  /etc/httpd/modules：模块路径，里面其实是个链接
+  /etc/httpd/logs --> /var/log/httpd：日志目录
+    日志文件有两类：访问日志access_log，错误日志：err_log
+  /var/www  页面路径
+    html：静态页面
+	cgi-bin：提供动态内容时所使用的路径
+	
+	cgi：Common Gateway Interface
+	  client --> httpd (index.cgi) --> Spawn Process (index.cgi) --> httpd --> client
+	  
+	fastcgi：动态进程
+	
+	程序：指令和数据组成
+	  数据，数据库服务
+
+安装httpd：yum -y install httpd
+rpm -ql httpd | less  查看安装完成后httpd生成的文件信息
+service httpd start  启动httpd脚本
+service httpd restart   重启httpd脚本
+netstat -tnlp | grep :80   查看80端口进程的信息
+ps aux | grep httpd   查看httpd的进程信息
+iptables -I INPUT -p tcp --dport 80 -j ACCEPT  以tcp协议开放80端口
+如果没有tree命令用yum install tree来安装
+httpd默认的配置是在/etc/httpd/welcome.conf里的信息
+httpd默认的文档页面是在/var/www/html
+/etc/httpd/conf/httpd.conf是httpd的主配置文件
+yum -y install httpd-manual  装上httpd的帮助文档在服务器路径后面加上manual即可查看
+
+httpd.conf：配置文件目录
+  directive value：指令值的形式
+    指令不区分字符大小写
+	value根据需要区分
+
+LoadRunner专业的测试工具
+
+httpd.conf配置文件：
+  ServerRoot "/etc/httpd"  服务器的根目录，里面有好多配置都是相对于这个路径来说的
+  PidFile run/httpd.pid   pid文件的路径
+  Timeout 120  访问超时时间
+  KeepAlive Off  是否启用长链接On是开启
+  MaxKeepAliveRequests 100  最多一次请求多少个长链接，0表示不限制
+  KeepAliveTimeout 15  长链接超时时间
+  Listen 80  指定的地址跟端口，如果不带ip地址说明监听当前主机上所有ip地址的80端口，可以监听多个端口
+  Listen 8080
+  LoadModule auth_basic_module modules/mod_auth_basic.so  httpd在启动时加载的模块，路径是相对路径；模块名称 模块路径
+  include conf.d/*.conf   把conf.d目录下以conf结尾的文件包含进来
+  User apache   apache的worker进程使用的用户
+  Group apache   apache的worker进程使用的用户组
+  ServerAdmin root@localhost   服务器管理员，可以是每一个站点都定义一下 每一个虚拟主机都可以有一个
+  ServerName www.example.com:80  服务器名字，如果不指定会反射解析ip到主机名，如果成功则把主机名当做服务器的名字，否则会报错
+  DocumentRoot "/var/www/html"  文档根目录
+    <Directory "/var/www/html">
+	  Options Indexes FollowSymLinks     #选项 Indexes允许索引目录，生产环境中不需要，作为下载站用的时候才需要
+	                                           None：任何选项都不支持
+											   FollowSymLinks：允许访问符号链接指向的原文件，允许符号链接。也就是说目录下如果有链接文件指向其他文件时，允许访问链接到的文件
+											   Includes：允许执行服务器端包含(SSI)
+											   SymLinksifOwnerMatch：
+											   ExecCGI：是否允许执行CGI脚本
+											   MultiViews：多功能视图，内容协商相当于国际化
+											   All：支持所有选项
+	  AllowOverride None                 #允许覆盖
+	                                      AuthConfig需要通过用户账号密码认证后才可以访问
+										    例子：
+											AllowOverride AuthConfig
+											AuthType Basic   #使用基本认证类型
+											AuthName "Restricted Files"    #用户认证时显示的名字
+											AuthUserFile /usr/local/apache/passwd/passwords     #用户认证时的账号密码文件
+											  建立/usr/local/apache/passwd/passwords
+											  使用htpasswd来管理，第一次用的时候要用-c
+											  htpasswd -c -m /usr/local/apache/passwd/passwords hadoop   #添加hadoop用户passwords
+											  htpasswd -m /usr/local/apache/passwd/passwords tom   #添加tom用户到passwords里
+											AuthGroupFile /usr/local/apache/passwd/groups   #基于用户组来认证
+											  直接在/usr/local/apache/passwd/下面直接编辑vim groups内容如下
+											  mygroup: hadoop tom
+											Require user marion   #只有marion才可以登录
+											Require group mygroup  #只允许GroupName组登录
+											Require valid-user   #只要出现在文件里的用户都可以登录
+	  Order allow,deny                   #用于定义基于主机的访问功能的，IP，网络地址或主机定义访问控制机制
+	  Allow from all
+	                                     #例子：
+										 Order allow,deny
+										 Deny from 192.168.0.0/24   只允许192.168.0.0的客户端访问
+										 
+										 Order deny,allow
+										 Deny from 192.168.0.0/24   不允许192.168.0.0的客户端访问
+										 
+										 Order deny,allow
+										 Deny from 172.16.100.177 192.168.0.1
+										 
+										 地址表示方式：
+										 IP
+										 network/netmask
+										 HOSTNAME: www.a.com
+										 DOMAINNAME:magedu.com
+										 Partial IP: 172.6, 172.16.0.0/16
+	</Directory>
+  DirectoryIndex index.html index.html.var   #默认访问的页面，设置首页
+  AccessFileName .htaccess    #每个目录的访问机制，这种方式效率很低，一般禁用掉
+  <Files ~ "^\.ht">     #第一个~表示对后面进行匹配模式
+    Order allow,deny
+    Deny from all
+  </Files>
+  TypesConfig /etc/mine.types    #那个配置文件里保存所支持的mine类型
+  DefaultType text/plain    #默认的mine类型，纯文本类型
+  HostnameLookups Off    #用户的访问地址是否反解析为主机名
+  ErrorLog logs/error_log  #定义错误日志
+  LogLevel warn  #日志级别
+  LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined   #访问日志格式
+    %h：客户端地址
+	%l：客户端登录名称，大多数是-
+	%u：登录网站时的用户，如果没登录是-
+	%t：日志事件产生的时间
+	%r：请求报文的第一行
+	%>s：最后一次请求的状态码
+	%b：应该报文的大小
+	%{Referer}i：表示从那个页面来的
+	%{User-Agent}i：客户端浏览器的类型
+  CustomLog logs/access_log combined;   #访问日志
+  Alias /icons/ "/var/www/icons/"     #路径别名，最后的/前后要一致，要有都有，要没有都没有
+
+
+
+<IfModule prefork.c>                   #某个模块启用
+StartServers       8                   #服务器启动是启动多少个进程
+MinSpareServers    5                   #最小空闲进程
+MaxSpareServers   20                   #最大空闲进程
+ServerLimit      256                   #为MaxClients提供的上线值，如果要调得先关闭httpd服务
+MaxClients       256                   #最多允许多少个请求链接进来
+MaxRequestsPerChild  4000              #一个进程最多响应多少次请求
+</IfModule>
+
+<IfModule worker.c>
+StartServers         4                 #服务器启动是启动多少个进程数
+MaxClients         300                 #最多允许多少个请求链接进来
+MinSpareThreads     25                 #最小空闲线程
+MaxSpareThreads     75                 #最大空闲线程
+ThreadsPerChild     25                 #每个进程生成多少个线程
+MaxRequestsPerChild  0                 #每个进程响应多少个请求，因为是线程管理所以是0
+</IfModule>
+
+<IfModule mod_userdir.c>              #是否支持用户在自己的家目录里建立个人的网页
+    UserDir disabled                  #不允许，注释掉即是允许  一般是不允许的
+	                                  #http://172.16.16.172/~hadoop/  来访问用户的家目录模块
+	UserDir public_html               #如果允许，在用户家目录下的public_html建立网页文件
+</IfModule>
+  
+MPM: Multi Path Modules(多道处理模块儿)
+  mpm_winnt
+  prefork: 一个请求用一个进程响应
+  worker: 启动多个进程，每个进程生成多个线程。每一个请求用一个线程响应
+  event: 一个进程响应多个请求
+
+httpd -l   列出当前系统httpd所支持的模块
+rpm -ql httpd | grep bin
+  默认情况下httpd是没有workder模型的，如果想使用worker则用htttpd.worker代替所有的httpd命令即可
+  或者更改/etc/sysconfig/httpd文件里HTTPD=/usr/sbin/httpd.worker的注释去掉重启httpd服务即可
+  想使用event时把HTTPD=/usr/sbin/httpd.event即可，在2.2中event是测试模块不建议用。2.4是默认的主流
+
+URL路径跟本地文件系统路径不是一码事儿，URL是相对于DocumentRoot的路径而言的。
+
+httpd -t 测试配置文件语法是否正确
+
+httpd -M  显示httpd额外装载的所有模块
+
+elinks 纯文本的浏览器
+elinks http://172.16.16.172
+  -dump  显示完网页内容后直接退出
+  -source  显示网页的源代码
+
+PV：Page View页面访问量，每天来统计
+UV：User View用户访问量，每天的独立ip访问量
+
+
+
+apache虚拟主机：
+
+apache：服务器，Host，物理主机
+
+虚拟主机：
+apache服务：
+  服务于多个不同的站点
+
+apache：
+  中心主机
+  虚拟主机
+    基于IP
+	 IP1:80
+	 IP2:80
+	基于端口
+	  IP:80
+	  IP:8080
+	基于域名
+	  IP:80
+	    主机名不同
+		  www.magedu.com
+		  www.a.org
+		  www.b.net
+中心主机跟虚拟主机不可以同时使用，如果需要把中心主机配置为虚拟主机
+
+apache 2.2
+需要指令启用基于主机名的的虚拟主机：NameVirtualHost
+apaehc 2.4
+三种不同名称虚拟主机，只需要各自定义就可以
+
+一个站点具备的信息：
+ServerName:     #主机名
+ServerAlias:    #主机别名www.a.org
+DocumentRoot /www/a.org/
+<Directory "/www/a.org">
+  Option
+  AllowOverride
+</Directory>
+Alias
+ErrorLog
+CustomLog
+<Location "/images">   #定义根目录下文件的使用情况
+</Location>
+ScriptAlias   #允许执行cgi脚本的目录CGI(Common Gateway Interface)
+
+要想使用虚拟主机，得先取消中心主机，注释中心主机的DocumentRoot即可。
+虚拟主机的定义：
+<VirtualHost HOST>
+</VirtualHost>
+
+基于IP，HOST的写法
+HOST
+  IP1:80
+  IP2:80
+
+基于端口：
+  IP:80
+  IP:8080
+
+基于域名：
+  *：80
+    ServerName 不同即可
+
+基于IP的虚拟主机：
+NameVirtualHost 172.16.16.173       #只让173启用虚拟主机
+<VirtualHost 172.16.16.172:80>
+  ServerName hello.magedu.com
+  DocumentRoot "/www/magedu.com"
+</VirtualHost>
+<VirtualHost 172.16.16.173:80>
+  ServerName www.a.org
+  DocumentRoot "/www/a.org"
+  <Directory "/www/a.org">         #定义在访问www.a.org的时候必须输入用户名密码才可
+                                   #需用htpasswd -c -m /etc/httpd/.htpasswd jerry  先创建文件并添加一个用户
+								   #再加一个用户htpasswd -m /etc/httpd/.htpasswd tom
+    Options none
+    AllowOverride authconfig
+    AuthType basic
+    AuthName "Restrict area."
+    AuthUserFile "/etc/httpd/.htpasswd"
+    Require valid-user
+  </Directory>
+</VirtualHost>
+<VirtualHost 172.16.16.173:80>
+  ServerName www.d.org
+  DocumentRoot "/www/d.org"
+  <Directory "/www/d.org">    #不让测试时的主机访问 可用elink在本机测试
+    Options none
+    AllowOverride none
+    Order deny,allow
+    Deny from 192.168.1.101
+  </Directory>
+</VirtualHost>
+<VirtualHost 172.16.16.173:8080>   #还需要在主配置文件httpd.conf里多监听一个端口在Listen 80下面添加Listen 8080
+  ServerName www.b.org
+  DocumentRoot "/www/b.org"
+</VirtualHost>
+然后去创建这两个目录
+service httpd restart  重启httpd服务
+给当前的ip取一个别名：
+ip addr add 172.16.16.173/16 dev eth0  #取别名
+ip addr show   #查看显示
+
+linux下的hosts是/etc/hosts，格式跟windows一样
+编辑windows下的hosts文件来实现域名解析C:\Windows\System32\drivers\etc\hosts文件内容如下
+127.0.0.1       localhost
+192.168.1.253   www.a.org
+192.168.1.253   www.d.org
+
+当使用ip地址访问时响应的时候响应符合条件的第一个虚拟主机
+
+httpd -t  检查配置文件语法错误
+
+tail /var/log/httpd/error_log   #httpd的错误日志
+
+如果想知道每一项的使用方式可用yum -install httpd-manual  然后访问ip/manual来查看帮助
+
+设定默认虚拟主机
+<VirtualHost _default_:80>
+  ServerName hello.magedu.com
+  DocumentRoot "/www/magedu.com"
+</VirtualHost>
+<VirtualHost _default_:*>
+  ServerName hello.magedu.com
+  DocumentRoot "/www/magedu.com"
+</VirtualHost>
+
+以下主设置访问查看httpd工作情况权限，默认是禁用的
+<Location /server-status>
+  SetHandler server-status
+  Order deny,allow
+  Deny from all
+  Allow from .example.com
+</Location>
+
+
+https协议
+apache搭建https协议，如果基于rpm包安装先需要安装mod_ssl模块
+yum install mod_ssl
+rpm -ql mod_ssl  #查看生成的文件
+/etc/httpd/conf.d/ssl.conf
+/usr/lib64/httpd/modules/mod_ssl.so
+/var/cache/mod_ssl
+/var/cache/mod_ssl/scache.dir
+/var/cache/mod_ssl/scache.pag
+/var/cache/mod_ssl/scache.sem
+因有/etc/httpd/conf.d/ssl.conf所有得重启httpd服务
+
+
+查看httpd是否支持cgi可在配置文件httpd.conf文件里查看：
+LoadModule cgi_module modules/mod_cgi.so    #是否加载cgi模块
+ScriptAlias /cgi-bin/ "/var/www/cgi-bin/"  #cgi脚本存放的位置
+
+可以/var/www/cgi-bin/下建立一个test.sh文件加上执行权限测试一下，内容如下
+#!/bin/bash
+#
+cat << EOF
+ Content-Type: text/html
+
+ <pre>
+  <h1>$(/bin/date)</h1>
+ </pre>
+EOF
+用浏览器访问：http://ip/cgi-bin/test.sh
+
+
+yum list all | grep php  #查看php安装包的信息
+yum install php  #安装php
+rpm -ql php   #查看php安装完成的软件
+
+安装完成之后可在/var/www/html目录下添加一个index.php来测试，把以下代码加入到文件里：
+<?php
+phpinfo();
+?>
+
+
+php里使用;号做为注释符
+
+
+RDBMS(数据库管理软件功能)：
+1、数据库创建、删除
+2、创建表、删除表、修改表
+3、索引的创建、删除
+4、用户和权限
+5、数据增、删、改
+6、查询
+
+DML：Data Manapulate Language：数据操作语言
+  INSERT, REPLACE, UPDATE, DELETE
+DDL：Data Defination Language：数据定义语言
+  CREATE, ALTER, DROP
+DCL：Data Control Language：数据控制语言
+  GRANT, REVOKE
+
+SELECT
+
+RDBMS：
+  Oracle, Sybase, Infomix, DB2, SQL Server
+  egreSQL第一款关系型数据库
+  开源数据：MySQL, PostgreSQL(pgsql, EnterpriseDB)
+mysql
+ MariaDB  #mysql原作者搞的
+ MySQL--> Percona(需要关注一下)
+
+反关系模型：NoSQL
+ MongoDB
+ Redis
+ HBase
+
+DBMS：
+ 数据管理独立性
+ 有效地完成数据库存取
+ 数据完整性和安全性
+ 数据集中管理
+ 并发存储与故障恢复
+ 减少应用程序开发时间
+
+
+MySQL:
+ Community Edtion  社区版
+ Enterprise Edtion 企业版
+
+软件包格式：
+ 软件包管理器物有的格式
+  rpm包，.exe格式等
+ 通用二进制格式
+ 源程序
+
+mysql安装
+yum install mysql-server  #在安装server时也会把mysql也装上
+service mysqld start  #启动mysql，当第一次启动mysql时会自动初始化mysql数据库
+
+
+mysql
+ -u USERNAME #用户名，如果不指定则是root
+ -p    #密码，如果不指定则是空密码
+ -h MYSER_SERVER  #主机名，如果不指定则是localhost。如果地址是本机在linux上用的是socket来连接,windows上用的是memory(共享内存)，其他用的是tcp/ip来连接
+
+mysql用户包含USERNAME@HOST,由两段一组成
+quit是退出mysql
+
+mysql客户端
+ 交互式模式
+ 批处理模式
+  执行mysql脚本
+
+交互式模式中的命令类型：
+ 客户端命令：所有的客户端命令都可以直接使用
+ 服务器端命令：都必须使用语句结构符，默认是分号;
+
+SQL接口：
+ Oracle, PL/SQL
+ SQL Server, T-SQL
+
+关系数据库对象：
+ 库
+ 表
+ 索引
+ 视图
+ 约束
+ 存储过程
+ 存储函数
+ 触发器
+ 游标
+ 
+ 权限
+ 事务
+
+DDL
+ CREATE
+ ALTER
+ DROP
+DML
+ INSERT
+ UPDATE
+ DELETE
+DCL
+ GRANT
+ REVOKE
+
+创建数据库
+ CREATE DATABASE db_name;
+  例子：
+   create database testdb; #创建一个数据库
+   create database if not exists testdb;  #如果数据库不存在就创建
+ DROP DATABASE db_name;
+  例子：
+   drop database testdb;  #删除一个数据库，mysql没有回收站，删除就恢复不回来了
+
+创建表
+ show tables;  #显示一个数据里所有表
+ show tables from db_name;  #显示一个数据库里所有表
+ desc tb_name;  #显示一个表的表结构
+
+修改表：
+ alert table tb_name
+  modify  #修改列的类型
+  change  #改变列名称
+  add   #添加列
+  drop  #删除字段
+
+创建用户：
+ CREATE USER 'USERNAME'@'HOST' IDENTIFIED BY 'PASSWORD';   #创建用户并设置密码
+ DROP USER 'USERNAME'@'HOST';
+ 
+ HOST:
+  IP:
+  HOSTNAME:
+  NETWORK:
+  通配符
+   _：匹配任意单个字符，172.16.0._
+   %：匹配任意字符
+
+DCL(授权)：
+ GRANT pri1, pri2,... ON DB_NAME.TB_NAME TO 'USERNAME'@'HOST' [IDENTIFIED BY 'PASSWORD']; #授权，如果用户不存在会自己创建用户并设置你写的密码
+ REVOKE pri1, pri2,... ON DB_NAME.TB_NAME FROM 'USERNAME'@'HOST';   #取消权限
+ SHOW GRANTS FOR 'USERNAME'@'HOST';   #查看用户所具有的权限
+ 
+ 例子：
+  GRANT ALL PRIVILEGES ON testdb.* TO 'jerry'@'%';  把数据库testdb的所有权限给jerry让他可以在任何客户端里登录
+  GRANT ALL PRIVILEGES ON *.* TO 'jerry'@'172.16.%.%' IDENTIFIED BY 'jerry';  #给jerry所有的权限，只在172.16网段上可以访问
+
+为用户设定密码：
+1、SET PASSWORD FOR 'USERNAME'@'HOST'=PASSWORD('password');
+2、mysqladmin -uUSERNAME -hHOST -p password 'password'  #修改用户的密码
+3、UPDATE user SET Password=PASSWORD('123456') WHERE USER='root' AND Host='127.0.0.1'
+
+
+FLUSH PRIVILEGES;  #让mysql重新读取授权表
+
+
+图形客户端工具：
+1 phpMyAdmin
+ 安装phpMyAdmin之前必须要装php-mbstring安装方法：yum install php-mbstring
+2 Workbench
+3 MySQL Front
+4 Navicat for MySQL
+5 Toad
+
+
+
+
+yum install php-mysql  #安装php与mysql的驱动
+
+写一个这样的脚本来测试
+<html>
+<head>
+</head>
+<body>
+<h1>this is a test</h1>
+<?php
+$conn=mysql_connect('localhost','root','');
+if($conn)
+echo "success...";
+else
+echo "failur...";
+?>
+</body>
+</html>
+
+
+论坛：
+ discuz
+  安装时如果下载的是gbk版本，则需要把httpd.conf文件里AddDefaultCharset UTF-8注释掉，一般下载utf3版本
+  如果文件夹需要写权限的时候，为安全起见把单个文件夹一个一个都改为777权限，
+ phpwind
+ phpbb
+门户：
+ drupal
+ joomla
+
+cloudware云计算平台
+
+
+
+
+
+LAMP安装次序：httpd --> MySQL --> php --> XCache
+
+httpd
+ 依赖：
+  apr
+  apr-util
+  apr-iconv：一般不用装，只装前两个就可以
+
+
+在所有的编译安装之前需要安装编译环境：
+yum groupinstall "Development Tools" "Development Libraries"
+apr --> apr-util --> httpd
+
+下载apr包：
+wget http://mirrors.cnnic.cn/apache//apr/apr-1.5.2.tar.bz2
+wget http://mirrors.cnnic.cn/apache//apr/apr-util-1.5.4.tar.bz2
+tar xf apr-1.5.2.tar.bz2
+cd apr-1.5.2
+./configure --help  #得到安装帮助
+mkdir /usr/local/apr
+./configure --prefix=/usr/local/apr
+make
+make install  #apr安装完成
+cd ..
+tar xf apr-util-1.5.4.tar.bz2
+cd apr-util-1.5.4
+./configure --help
+mkdir /usr/local/apr-util
+./configure --prefix=/usr/local/apr-util --with-apr=/usr/local/apr  #指定apr安装的目录
+make
+make install   #apr-util已经安装完成
+cd ..
+wget http://apache.fayea.com//httpd/httpd-2.4.23.tar.bz2
+tar xf httpd-2.4.23.tar.bz2
+cd httpd-2.4.23
+./configure --help
+clear
+mkdir /usr/local/apache
+yum install pcre-devel  #安装之前先检测是否已经安装
+yum install openssl-devel
+yum update openssl  #安装之前先检测是否已经安装或者更新一下
+./configure --prefix=/usr/local/apache --sysconfdir=/etc/httpd --enable-so --enable-rewirte --enable-ssl --enable-cgi --enable-cgid --enable-modules=most --enable-mods-shared=most --enable-mpms-shared=all --with-apr=/usr/local/apr --with-apr-util=/usr/local/apr-util
+make
+make install  #启动httpd之前要关闭selinux具体方法上面有
+/usr/local/apache/bin/apachectl start  #启动httpd
+
+AH00557: httpd: apr_sockaddr_info_get() failed for centos6
+AH00558: httpd: Could not reliably determine the server's fully qualified domain name, using 127.0.0.1. Set the 'ServerName' directive globally to suppress this message
+如果报以上错误，在httpd.conf里设置一个ServerName 127.0.0.1:80即可，然后再启动
+
+编辑/etc/httpd/httpd.conf在ServerRoot这行下添加以下内容
+PidFile "/var/run/httpd.pid"  #修改进程文件存放的目录
+
+写脚本
+vim /etc/init.d/httpd  #内容如下
+#!/bin/bash
+#
+# httpd        Startup script for the Apache HTTP Server
+#
+# chkconfig: - 85 15
+# description: Apache is a World Wide Web server.  It is used to serve \
+#	       HTML files and CGI.
+# processname: httpd
+# config: /etc/httpd/conf/httpd.conf
+# config: /etc/sysconfig/httpd
+# pidfile: /var/run/httpd.pid
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+if [ -f /etc/sysconfig/httpd ]; then
+        . /etc/sysconfig/httpd
+fi
+
+# Start httpd in the C locale by default.
+HTTPD_LANG=${HTTPD_LANG-"C"}
+
+# This will prevent initlog from swallowing up a pass-phrase prompt if
+# mod_ssl needs a pass-phrase from the user.
+INITLOG_ARGS=""
+
+# Set HTTPD=/usr/sbin/httpd.worker in /etc/sysconfig/httpd to use a server
+# with the thread-based "worker" MPM; BE WARNED that some modules may not
+# work correctly with a thread-based MPM; notably PHP will refuse to start.
+
+# Path to the apachectl script, server binary, and short-form for messages.
+apachectl=/usr/local/apache/bin/apachectl
+httpd=${HTTPD-/usr/local/apache/bin/httpd}
+prog=httpd
+pidfile=${PIDFILE-/var/run/httpd.pid}
+lockfile=${LOCKFILE-/var/lock/subsys/httpd}
+RETVAL=0
+
+start() {
+        echo -n $"Starting $prog: "
+        LANG=$HTTPD_LANG daemon --pidfile=${pidfile} $httpd $OPTIONS
+        RETVAL=$?
+        echo
+        [ $RETVAL = 0 ] && touch ${lockfile}
+        return $RETVAL
+}
+
+stop() {
+	echo -n $"Stopping $prog: "
+	killproc -p ${pidfile} -d 10 $httpd
+	RETVAL=$?
+	echo
+	[ $RETVAL = 0 ] && rm -f ${lockfile} ${pidfile}
+}
+reload() {
+    echo -n $"Reloading $prog: "
+    if ! LANG=$HTTPD_LANG $httpd $OPTIONS -t >&/dev/null; then
+        RETVAL=$?
+        echo $"not reloading due to configuration syntax error"
+        failure $"not reloading $httpd due to configuration syntax error"
+    else
+        killproc -p ${pidfile} $httpd -HUP
+        RETVAL=$?
+    fi
+    echo
+}
+
+# See how we were called.
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  status)
+        status -p ${pidfile} $httpd
+	RETVAL=$?
+	;;
+  restart)
+	stop
+	start
+	;;
+  condrestart)
+	if [ -f ${pidfile} ] ; then
+		stop
+		start
+	fi
+	;;
+  reload)
+        reload
+	;;
+  graceful|help|configtest|fullstatus)
+	$apachectl $@
+	RETVAL=$?
+	;;
+  *)
+	echo $"Usage: $prog {start|stop|restart|condrestart|reload|status|fullstatus|graceful|help|configtest}"
+	exit 1
+esac
+
+exit $RETVAL
+
+
+脚本完成
+chmod +x /etc/init.d/httpd
+chkconfig --add httpd   #把httpd服务添加到开机启动的服务列表里去
+chkconfig --level 35 httpd on   #让httpd在35级别自动启动
+chkconfig --list httpd  #查看httpd自动启动的级别
+
+添加环境变量
+vim /etc/profile.d/httpd.sh  #内容如下
+export PATH=$PATH:/usr/local/apache/bin
+如果想让这个环境变量生效可以重新登录一下
+
+若想切换prefork工作模式
+#LoadModule mpm_event_module modules/mod_mpm_event.so   #把这行注释掉
+LoadModule mpm_prefork_module modules/mod_mpm_prefork.so  #去掉这行注释
+httpd -t   #检测语法错误
+service httpd restart  #重启
+
+
+
+httpd 2.4新特性
+1、MPM可于运行时装载
+ --enable-mpms-shared=all --with-mpm=event
+2、Event MPM可于运行时装载
+3、异步读写
+4、在每个模块及每个目录上指定日志级别
+5、每请配置：<If>, <ElseIf>, <Else>;
+6、增强的表达式分析器；
+7、毫秒级的KeepAlive Timeout;
+8、基于域名的虚拟主机不再需要NameVirtualHost指令；
+9、降低了内存占用；
+10、支持在配置文件中使用自定义变量；
+
+新增加的模块：
+mod_proxy
+mod_proxy_fcgi
+mod_proxy_scgi
+mod_proxy_express
+mod_remoteip
+mod_session
+mod_ratelimit
+mod_request
+等等；
+
+对于基于ip的访问控制
+Order allow,deny
+allow from all
+2.4中不再使用以上方法
+
+2.4使用Require user
+Require not ip IPADDR
+Require ip IPADDR
+ IP
+ NETWORK/NETMASK
+ NETWORK/LENGTH
+ NET
+  172.16.0.0/255.255.0.0 = 172.16.0.0/16 = 172.16
+Require host HOSTNAME
+ HOSTNAME
+ DOMAIN
+  www.magedu.com
+  .magedu.com
+  
+  允许所有主机访问：
+  Require all granted
+  
+  拒绝所有主机访问：
+  Require all deny
+Require user USERNAME
+Require group GROUPNAME
+
+
+MySQL：配置文件格式，集中式配置文件，可以为多个程序提供配置
+[mysql]
+
+[mysqld]
+
+/etc/my.cnf --> /etc/mysql/my.cnf --> $BASEDIR/my.cnf --> ~/.my.cnf
+
+
+
+MySQL安装
+wget http://mirrors.sohu.com/mysql/MySQL-5.7/mysql-5.7.15-linux-glibc2.5-x86_64.tar.gz  #下载mysql
+tar xf mysql-5.7.15-linux-glibc2.5-x86_64.tar.gz -C /usr/local
+cd /usr/local
+ln -sv mysql-5.7.15-linux-glibc2.5-x86_64 mysql
+cd mysql
+groupadd -r -g 306 mysql  #添加mysql用户组
+useradd -g 306 -r -u 306 mysql  #添加mysql用户
+chown -R mysql.mysql /usr/local/mysql/*
+bin/mysql_install_db --help  #查看初始化脚本的选项
+mkdir mydata  #用于存放数据
+chown -R mysql.mysql mydata  #更改属主属组
+chmod o-rx mydata  #去掉其他用户的读写权限
+chown -R root /usr/local/mysql/*  #把属主再改回来
+chown -R mysql.mysql mydata  #改数据存放文件
+cp support-files/mysql.server /etc/init.d/mysqld  #复制启动脚本
+cp support-files/my-default.cnf /etc/my.cnf #复制配置
+vim /etc/init.d/mysqld  #把以下两个内容设置上去
+basedir=/usr/local/mysql
+datadir=/usr/local/mysql/data
+bin/mysqld --initialize --user=mysql --datadir=/usr/local/mysql/data  #初始化数据文件，会生成一个密码记下来
+mysql -uroot -hlocalhost -p   #用刚才生成的密码登录
+set password=password('123456');   #必须修改密码后才可以使用
+flush privileges;   #让mysql重新读取密码表
+quit   #退出，再重新登录就可以用了
+
+想把mysql的帮助文档可以用myql man调出来
+vim /etc/man.config  #编辑在最后添加
+MANPATH /usr/local/mysql/man
+
+输出mysql的库文件
+vim /etc/ld.so.conf.d/mysql.conf  #内容如下
+/usr/local/mysql/lib
+ldconfig -v   #重读库文件，库文件的缓存文件是/etc/ld.so.cache
+
+输出头文件
+ln -sv /usr/local/mysql/include /usr/include/mysql
+
+
+MySQL服务器维护了两类变量：
+ 服务器变量
+  定义MySQL服务器运行特性
+  SHOW GLOBAL VARIABLES [LIKE 'STRING']
+ 状态变量：
+  保存了MySQL服务器支行统计数据
+  SHOW GLOBAL STATUS [LIKE 'STRING']
+
+MySQL通配符：
+ _：任意单个字符
+ %：任意长度的任意字符
+
+select user();  #显示当前登录的用户
+
+
+
+
+php支持扩展功能：
+ xcache
+ 
+ 
+ 
+ 
+ 
+依赖包可以到rpmfind.net上去搜索
+
+
+
+
+
+
+压力测试工具：
+ab
+http_load
+webbench
+siege
+
+
+ 
+
+
+
+
+
+编译安装php：
+wget http://cn2.php.net/distributions/php-5.6.27.tar.gz
+wget http://cn2.php.net/distributions/php-5.6.26.tar.bz2  #下载php
+cd php-5.6.26
+
+解决依赖关系
+wget ftp://rpmfind.net/linux/dag/redhat/el6/en/x86_64/dag/RPMS/libmcrypt-2.5.7-1.2.el6.rf.x86_64.rpm
+wget ftp://rpmfind.net/linux/dag/redhat/el6/en/x86_64/dag/RPMS/libmcrypt-devel-2.5.7-1.2.el6.rf.x86_64.rpm
+rpm -ivh libmcrypt-2.5.7-1.2.el6.rf.x86_64.rpm
+rpm -ivh libmcrypt-devel-2.5.7-1.2.el6.rf.x86_64.rpm
+wget ftp://rpmfind.net/linux/remi/enterprise/5/remi/x86_64/mhash-0.9.2-6.el5.remi.x86_64.rpm
+wget ftp://rpmfind.net/linux/remi/enterprise/5/remi/x86_64/mhash-devel-0.9.2-6.el5.remi.x86_64.rpm
+rpm -ivh mhash-0.9.2-6.el5.remi.x86_64.rpm
+rpm -ivh mhash-devel-0.9.2-6.el5.remi.x86_64.rpm
+yum install bzip2
+yum install libxml2-devel
+yum install bzip2-devel
+yum install mysql-devel
+
+
+./configure --prefix=/usr/local/php --with-mysql=/usr/local/mysql --with-openssl --with-mysqli=/usr/local/mysql/bin/mysql_config --enable-mbstring --with-freetype-dir --with-jpeg-dir --with-png-dir --with-zlib --with-libxml-dir=/usr --enable-xml  --enable-sockets --with-apxs2=/usr/local/apache/bin/apxs --with-mcrypt  --with-config-file-path=/etc --with-config-file-scan-dir=/etc/php.d --with-bz2  --enable-maintainer-zts
+说明：
+1、这里为了支持apache的worker或者event这两个MPM，编译时使用了--enable-maintainer-zts选项，如果是perfork就不需要指定
+2、如果使用php 5.3以上版本，为了链接mysql数据库，可以指定mysqlnd，这样在本机就不需要先安装mysql或者mysql开发包了。mysqlnd从php 5.3开始可用，可以编译时绑定它(而不用和个体的mysql客户端绑定形成依赖)，但是从php5.4开始它就是默认值了。
+./configure --with-mysql=mysqlnd --with-pdo-mysql=mysqlnd --with-mysqli=mysqlnd
+
+
+如果报以下错误
+Cannot find libmysqlclient_r under /usr/local/mysql
+
+可以到/usr/local/mysql/lib下建立以下链接
+ln -sv libmysqlclient.so libmysqlclient_r.so
+再次./configure即可
+
+make
+make install
+cp php.ini-production /etc/php.ini  #复制配置文件
+vim php.ini
+
+让httpd跟php结合
+vim /etc/httpd/httpd.conf   #编辑httpd配置文件，查找AddType，在AddType application/x-gzip .gz .tgz 下添加
+AddType application/x-httpd-php .php
+AddType application/x-httpd-php-source .phps
+#找到DirectoryIndexi添加index.php做为首页面
+DirectoryIndex index.php index.html
+
+#然后把/usr/local/apache/htdocs下的index.html改为index.php
+mv /usr/local/apache/htdocs/index.html index.php
+vim /usr/local/apache/htdocs/index.php  #内容如下
+<html>
+<body>
+<h1>It works, my apache!</h1>
+<?php
+phpinfo();
+?>
+</body>
+</html>
+然后打开本机的80端口测试
+
+测试链接mysql，内容如下
+<html>
+<body>
+<h1>It works, my apache!</h1>
+<?php
+$conn=mysql_connect("localhost","root","123456");
+if ($conn)
+echo "Success...";
+else
+echo "Failure...";
+?>
+</body>
+</html>
+
+#安装xcache
+wget http://xcache.lighttpd.net/pub/Releases/3.2.0/xcache-3.2.0.tar.gz
+tar xvf xcache-3.2.0.tar.gz
+cd xcache-3.2.0
+/usr/local/php/bin/phpize   #安装扩展生成./configure文件来编译安装
+./configure --enable-xcache --with-php-config=/usr/local/php/bin/php-config  #不用指安装目录会自动安装到php的扩展目录里
+make
+make install
+mkdir /etc/php.d
+cp xcache.ini /etc/php.d/
+vim /etc/php.d/xcache.ini  #编辑样例配置文件
+#在[xcache-common]下添加以下内容
+zend_extension = /usr/local/php/lib/php/extensions/no-debug-zts-20131226/xcache.so  #xcache.so前面的值是make install安装成功输出的内容
+#可用phpinfo();来查看xcache启用了没有
+
+
+httpd支持虚拟主机
+cd /etc/httpd/
+vim httpd.conf
+#DocumentRoot "/usr/local/apache/htdocs"   #把这行给注释掉
+Include /etc/httpd/extra/httpd-vhosts.conf  #把这项给启动起来，把虚拟主机配置在这个文件中
+vim /etc/httpd/extra/httpd-vhosts.conf #把原有的例子注释掉添加以下内容
+<VirtualHost *:80>
+    ServerName 192.168.1.149
+    DocumentRoot "/usr/local/apache/htdocs/80/web"
+	<Directory "/usr/local/apache/htdocs/80/web">   #这个可以不用写除非报Forbidden错误
+	    Options none
+		AllowOverride none
+		Require all granted
+	</Directory>
+    ErrorLog "/usr/local/apache/htdocs/80/log/error"
+    CustomLog "/usr/local/apache/htdocs/80/log/access" combined  #combined比common日志列详细
+</virtualHost>
+
+mkdir /usr/local/apache/htdocs/80/web -pv
+mkdir /usr/local/apache/htdocs/80/log -pv
+mv /usr/local/apache/htdocs/index.php /usr/local/apache/htdocs/80/web/
+service httpd restart
+测试即可
+
+
+httpd启用ssl功能
+vim /etc/httpd/httpd.conf    #编辑配置文件
+Include /etc/httpd/extra/httpd-mpm.conf  #这个最好也启动起来，这个文件定义了不同模式下的工作参数
+LoadModule ssl_module modules/mod_ssl.so  #启用这行
+Include /etc/httpd/extra/httpd-ssl.conf   #这行也启用
+vim /etc/httpd/extra/httpd-ssl.conf  #编辑这个文件
+DocumentRoot "/usr/local/apache/htdocs/80/web"
+ServerName 192.168.1.149
+ServerAdmin you@example.com
+ErrorLog "/usr/local/apache/htdocs/80/log/error"
+TransferLog "/usr/local/apache/htdocs/80/log/access"
+SSLCertificateFile "/etc/httpd/server.crt"
+SSLCertificateKeyFile "/etc/httpd/server.key"
+
+#设置好后把相应的证书搞好重启就可以了
+
+
+
+以fastcgi方式安装
+./configure --prefix=/usr/local/php --with-mysql=/usr/local/mysql --with-openssl --with-mysqli=/usr/local/mysql/bin/mysql_config --enable-mbstring --with-freetype-dir --with-jpeg-dir --with-png-dir --with-zlib --with-libxml-dir=/usr --enable-xml  --enable-fpm --with-mcrypt  --with-config-file-path=/etc --with-config-file-scan-dir=/etc/php.d --with-bz2
+make & make install
+cp php.ini-production /etc/php.ini
+#为php-fpm提供Sysv init脚本，并将其添加至服务列表：
+cp sapi/fpm/init.d.php-fpm /etc/rc.d/init.d/php-fpm
+chmod +x /etc/rc.d/init.d/php-fpm
+chkconfig php-fpm on
+
+#为php-fpm提供配置文件
+cp /usr/local/php/etc/php-fpm.conf.default /usr/local/php/etc/php-fpm.conf
+#编辑php-fpm的配置文件
+vim /usr/local/php/etc/php-fpm.conf
+#配置fpm的相关选项为你所需要的值，并启用pid文件
+pm.max_children = 50
+pm.start_servers = 5
+pm.min_spare_servers = 2
+pm.max_spare_servers = 8
+pid = /usr/local/php/var/run/php-fpm.pid
+#接下来就可以启动php-fpm了
+service php-fpm start
+#使用如下命令来验证(如果此命令输出有几个php-fpm进程就说明启动成功了)
+ps aux | grep php-fpm
+#默认情况下，fpm监听在127.0.0.1的9000端口，也可以使用如下命令证其是否已经监听在相应的套接字
+netstat -tnlp | grep php-fpm
+
+配置httpd-2.4.4
+#启用httpd的相关模块
+#在httpd 2.4以后已经专门有一个模块针对FastCGI的实现，此模块为mod_proxy_fcgi.so，它其实是mod_proxy.so模块的扩充，因此这两个模块都要启用
+LoadModule proxy_module modules/mo_proxy.so
+LoadModule proxy_fcgi_module modules/mo_proxy_fcgi.so
+#配置虚拟主机支持使用facgi
+#在相应的虚拟主机中添加如下两行
+ProxyRequests Off #类似于ProxyPass /images/a.jpg http://172.16.100.2/images/a.jpg
+ProxyPassMatch ^/(.*\.php)$ fcgi://127.0.0.1:9000/PATH/TO/DOCUMENT_ROOT/$1   #支持正则表达式
+例如：
+<VirtualHost *:80>
+    DocumentRoot "/usr/local/apache/htdocs/80/web"
+    ServerName 192.168.1.149
+
+	ProxyRequests Off
+	ProxyPassMatch ^/(.*\.php)$ fcgi://127.0.0.1:9000/www/magedu.com/$1
+
+    <Directory "/usr/local/apache/htdocs/80/web">
+        Options none
+        AllowOverride none
+        Require all granted
+    </Directory>
+</VirtualHost>
+
+ProxyRequests Off：关闭正向代理
+ProxyPassMatch：把以.php结尾的文件请求发送到php-fpm进程，php-fpm至少需要知道运行的目录和URI，所以这里直接在fcgi://127.0.0.1:9000后指明了这两个参数，其它的参数的传递已经被mod_proxy_fcgi.so进行了封装，不需要手动指定。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

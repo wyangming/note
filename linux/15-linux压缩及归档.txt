@@ -1,0 +1,265 @@
+linux压缩及归档
+
+压缩、解压缩命令
+
+压缩格式：gz, bz2, xz, zip, Z
+
+压缩算法：算法不同，压缩比也会不同。
+压缩前的大小减去压缩后的大小再比上原文件大小就是压缩比
+
+compress：早期的压缩，压缩完后FILENAME.Z
+uncompress：解压
+
+常用的压缩有：xz, bz2, gz，这三个只可以压缩文件不可以压缩目录，还会删除原文件保留压缩文件
+
+gzip：FILENAME.gz    如果这个命令指向一个目录的话会把目录下的文件逐个压缩
+	gzip /PATH/TO/SOMEFILE：可以指定多个文件，压缩的时候一个一个压缩。压缩后会删除原文件
+		-d：表示解压缩
+		-#：1-9指定压缩比，默认为6。压缩比越小，压缩速度越快，压缩后文件越大
+例子：
+gzip messages
+gzip -d messages.gz 相当于使用gunzip
+	
+gunzip:解压缩
+	gunzip /PATH/TO/SOMEFILE.gz：解压缩完后会删除原文件
+例子：
+gunzip messages.gz
+
+zcat可以看gzip压缩文件的内容
+	zcat /PATH/TO/SOMEFILE.gz：表示在不解压的情况下查看文本文件的内容
+例子：
+zcat messages.gz
+
+	
+bzip2：.bz2
+比gzip有着更大压缩比的压缩工具，使用格式近似， 也会删除原文件。压缩后的文件为.bz2，优式在压缩大文件
+bzip2 /PATH/TO/SOMEFILE
+	-d：表示解压缩
+	-#：1-9指定压缩比，默认为6。
+	-k：压缩时保留原文件
+例子：
+bzip2 messages
+bzip2 -d messages.bz2
+bzip2 -k messages
+	
+bunzip2 /PATH/TO/SOMEFILE.bz2：解压缩
+例子：
+bunzip2 messages.bz2
+
+bzcat：相当于zcat
+例子：
+bzcat messages.bz2
+
+xz：.xz
+如果没有装的话可用yum install xz来安装
+xz /PATH/TO/SOMEFILE
+	-d：表示解压缩
+	-#：1-9，指定压缩比，默认是6
+	-k：压缩时保留原文件
+例子：
+xz messages
+	
+unxz /PATH/TO/SOMEFILE.xz：解压缩
+例子：
+unxz messages.xz
+
+xzcat：相当于zcat
+例子：
+xzcat messages.xz
+
+xzdec：解压缩到屏幕上
+例子：
+xzdec messages.xz
+
+zip：压缩，可以压缩文件夹，不删除原文件，压缩比不大。是从多操作系统默认支持的压缩格式
+zip FILENAME.zip FILE1 FILE2 ...
+	参数：
+		-r：递归进行压缩
+	例子：
+		zip -r desc.zip desc
+把多个文件整合为一个文件是archive(归档)，归档并不意味着压缩。zip是一个即归档又压缩的工具
+unzip FILENAME.ZIP：解压缩
+
+tar：归档工具
+	参数：
+		-c：创建归档文件
+		-f FILE.tar：操作的归档文件
+		-x：还原归档
+		--xattrs：在归档的时保留文件的扩展属性信息
+		-t：不展开归档查看归档了那些文件
+		-v：详细列出归档或展开的文件
+		
+		-zcf：即归档又压缩
+		-zxf：解压缩
+			z是用来调用gzip，跟c用是归档，并压缩；跟x用是解压缩，并展开归档
+		-jcf：即归档又压缩
+		-jxf：解压缩并展开归档
+			j是用来调用bzip2，跟c用是归档，并压缩；跟x用是解压缩，并展开归档
+		-Jcf：即归档又压缩
+		-Jxf：解压缩并展开归档
+			J是用来调用xz，跟c用是归档，并压缩；跟x用是解压缩，并展开归档
+例子：
+tar -cf demo.tar *log* 归档
+tar -tf demo.tar 查看归档文件里有那些文件
+tar -xf demo.tar 解压归档文件
+tar -jcf demo.tar.bz2 *log*
+tar -jxf demo.tar.bz2
+tar -xf demo.tar.bz2 可以自动调用bzip2进行解压
+tar -tjf demo.tar.bz2
+tar -tf demo.tar.bz2
+
+cpio：归档工具
+file: 查看文件类型
+
+read 可以在脚本里跟用户交互
+read NAME
+	可以通过键盘接收数据到变量NAME里
+	read -p "Input two integers:" A B
+		-p：选项后可以直接跟提示符，可以不再用echo显示
+		-t：指定超时时间，单位为秒
+例子：
+输入两个数，求和
+echo -n "Input two intergers:"
+read A B
+echo "$A plus $B is : $[$A+$B]"
+
+read -p "Input two intergers:" A B
+echo "$A plus $B is : $[$A+$B]"
+
+read -t 5 -p "Input two intergers[100 and 1000]:" A B
+ [ -z $A ] && A=100
+ [ -z $B ] && B=1000
+echo "$A plus $B is : $[$A+$B]"
+
+归档指定文件
+read -p "Three files:" FILE1 FILE2 FILE3
+read -p "Destination:" DEST
+tar -jcf ${DEST}.tar.bz2 $FILE1 $FILE2 $FILE3
+
+read -p "Three files:" FILE1 FILE2 FILE3
+read -p "Destination:" DEST
+read -p "Compress[gzip|bizp2|xz]:" COMP
+case $COMP in
+gzip)
+	tar -zcf ${DEST}.tar.gz $FILE1 $FILE2 $FILE3 ;;
+bzip2)
+	tar -jcf ${DEST}.tar.bz2 $FILE1 $FILE2 $FILE3 ;;
+xz)
+	tar -cf ${DEST}.tar $FILE1 $FILE2 $FILE3
+	xz ${DEST}.tar ;;
+*)
+	echo "Unknown."
+	exit 9
+esac
+
+while循环：使用于循环次数未知的场景，要有退出条件
+语法：
+	while CONDITION; do
+		statement
+		...
+	done
+例子：
+计算100以内所有整数的和
+declare -i I=1
+declare -i SUM=0
+while [ I -le 100 ]; do
+	let SUM+=$I
+	let I++
+done
+echo $SUM
+
+把用户输入的信息转化为大写，quit退出
+read -p "Input something" STRING
+while [ $STRING != 'quit' ]; do
+	echo $STRING | tr 'a-z' 'A-Z'
+	read -p "Input something" STRING
+done
+
+判断root用户是否登录，如果登录显示root is logged in.否则一直检测
+who | grep "root" &> /dev/null
+RETVAL=$?
+while [ $RETVAL -ne 0 ]; do
+	sleep 5
+	who | grep "root" &> /dev/null
+	$RETVAL=$?
+done
+echo "root is logged in."
+
+显示用户选择的信息
+cat << EOF
+d|D) show disk usages.
+m|M) show memory usages.
+s|S) show swap usages.
+*) quit.
+EOF
+read -p "Your choice:" CHOICE
+while [ $CHOICE != 'quit' ]; do
+	case $CHOICE in
+	d|D)
+		echo "Disk usages:"
+		df -Ph ;;
+	m|M)
+		echo "Memory usages:"
+		free -m | grep "Mem" ;;
+	s|S)
+		echo "Swap Usage:"
+		free -m | grep "Swap" ;;
+	*)
+		echo "Unknown.." ;;
+	esac
+	read -p "Again your choice:" CHOICE
+done
+
+echo -e "\033[1mHello\033[0m, world."
+echo -e "\033[31mHello\033[0m, world."
+echo -e "\033[32mHello\033[0m, world."
+echo -e "\033[33mHello\033[0m, world."
+echo -e "\033[34mHello\033[0m, world."
+echo -e "\033[35mHello\033[0m, world."
+echo -e "\033[36mHello\033[0m, world."
+echo -e "\033[37mHello\033[0m, world."
+
+echo -e "\033[31mHello\033[0m, world."
+echo -e "\033[42mHello\033[0m, world."
+echo -e "\033[43mHello\033[0m, world."
+echo -e "\033[44mHello\033[0m, world."
+echo -e "\033[45mHello\033[0m, world."
+echo -e "\033[46mHello\033[0m, world."
+echo -e "\033[47mHello\033[0m, world."
+
+echo -e "\033[32;41mHello\033[0m, world."
+echo -e "\033[37;41mHello\033[0m, world."
+
+echo -e "\033[1;37;41mHello\033[0m, world."
+echo -e "\033[2;37;41mHello\033[0m, world."
+echo -e "\033[3;37;41mHello\033[0m, world."
+echo -e "\033[4;37;41mHello\033[0m, world."
+echo -e "\033[5;37;41mHello\033[0m, world."
+echo -e "\033[6;37;41mHello\033[0m, world."
+echo -e "\033[7;37;41mHello\033[0m, world."
+
+cat << EOF
+d|D) show disk usages.
+m|M) show memory usages.
+s|S) show swap usages.
+*) quit.
+EOF
+echo -e "\033[31mYour choice:\033[0m"
+read CHOICE
+while [ $CHOICE != 'quit' ]; do
+	case $CHOICE in
+	d|D)
+		echo "Disk usages:"
+		df -Ph ;;
+	m|M)
+		echo "Memory usages:"
+		free -m | grep "Mem" ;;
+	s|S)
+		echo "Swap Usage:"
+		free -m | grep "Swap" ;;
+	*)
+		echo "Unknown.." ;;
+	esac
+	echo -e "\033[31mYour choice:\033[0m"
+	read CHOICE
+done

@@ -1,0 +1,809 @@
+linux系统裁剪
+
+内核初始化：
+硬件探测
+装载驱动
+挂载根文件系统(rootfs)
+启动用户空间中的第一个进程init
+
+以下是redhat5的启动过程
+POST-->BIOS(Boot Sequence)-->BootLoader(MBR)-->Kernel(initrd,initramfs)-->init(/etc/inittab)
+/etc/inittab:
+	设定默认运行级别
+	系统初始化(/etc/rc.d/rc.sysinit)
+	运行指定级别的服务脚本
+		/etc/rc.d/init.d/
+		/etc/rc.d/rc#.d
+	启动虚拟终端
+	启动图形终端
+/etc/rc.d/rc.sysinit:
+	检测并以读写方式重新挂载根文件系统
+	设定主机名
+	检测并挂载/etc/fstab中的文件系统
+	启动swap分区
+	初始化外围硬件设备的驱动
+	根据/etc/sysctl.conf设定内核参数
+	激活udev和selinux
+	激活LVM和RAID设备
+	清理过期锁和PID文件
+	装载键映射
+
+裁剪基础：
+	关机和重启
+	主机名
+	运行对应服务脚本
+	启动终端
+	运行用户
+	定义单用户级别
+	装载网卡驱动，启用网络功能
+	提供一个web服务器
+
+	
+busybox项目：真正做到系统精简
+1M的busybox+Kernel一共不到5M可以拼成一个linux系统
+
+RHEL5,RHEL6的定制安装
+	自动化安装
+	定制引导安装
+	
+脚本编程知识点：
+变量中字符长度：${#VARNAME}
+stty -F /dev/console size 输出屏幕的行跟列
+写脚本的时候依赖的外围东西越少越好
+
+/etc/issu显示的是用户登录之前打印的内容
+CentOS release 5.11 (Final)
+Kernel \r on an \m
+默认用的是mingetty登录，可以解析\r与\m是什么，这里可以用man mingetty查看
+agetty也支持类似的用法
+
+在复制文件的时候-P与-d会保留链接
+
+1.关机和重启
+2.终端
+3.主机名
+4.IP地址(模块的装载和服务的实现)
+5.functions
+6.终端提示信息
+	/etc/issu文件内容
+7.rc.sysinit：挂载/etc/fstab中定义的其他文件系统
+	grep -E -v "\<swap|proc|sysfs\>" /etc/fstab | awk '{print $1}' | while read LINE; do awk '{print $1}' /proc/mounts | grep "^$LINE$"; done
+8.设定内核参数
+	etc/sysctl.conf里的内容可以生效
+	sysctl -p
+	把sysctl命令移植过去
+	提供vim etc/sysctl.conf文件
+	#设定网卡之间转化的功能
+	net.ipv4.ip_forward=1
+	其他功能可以参照/etc/sysctl.conf来写
+	想开机生效编辑vim etc/rc.d/rc.sysinit追加如下两行：
+	sysctl -p &> /dev/null
+	[ $? -eq 0 ] && success "Set kernel parameter" || failure "Set kernel parameter"
+9.用户
+	PAM：Pluggable Authentication Module
+	/etc/pam.d/* 所有文件
+	绕过PAM的用户登录：
+	/bin/login：login借助nsswitch(Network Service Switch)框架到/etc/passwd,/etc/shadow,/etc/group里完成认证
+	nsswitch：
+		库：libnss_file.so, libnss_nis.so, libnsss_ldap.so
+		配置文件：/etc/nsswitch.conf可以配置到那个库文件找用户认
+	nsswitch：网络服务转换或名称解析开关。名称解析是如何工作的
+	nsswitch依赖的库文件很多，都是以libnss开头分别在/lib/libnss*,/lib64/libnss*,/usr/lib/libnss*,/usr/lib64/libnss*
+	复制的时候只需要复制：cp -d /lib/libnss_files* /mnt/sysroot/lib/,cp -d /usr/lib/libnss_files.so /mnt/sysroot/usr/lib/,cp -d /usr/lib/libness3.so /usr/lib/libnessckbi.so /usr/lib/libnessutil3.so /mnt/sysroot/usr/lib
+	提供配置文件：
+	cp /etc/nsswitch.conf /mnt/sysroot/etc/
+	编辑vim /mnt/sysroot/etc/nsswitch.conf
+	只需要以下四行，其他的都可以删除
+	passwd:		files
+	shadow:		files
+	group:		files
+	hosts:		files dns
+	其实没有hosts文件，这一行也可以不要
+	添加一个hadoop用户
+	把root跟hadoop用户复制过去
+	grep -E "^(root|hadoop)\>" /etc/passwd > /mnt/sysroot/etc/passwd
+	grep -E "^(root|hadoop)\>" /etc/shadow > /mnt/sysroot/etc/shadow
+	grep -E "^(root|hadoop)\>" /etc/group > /mnt/sysroot/etc/group
+	移植程序：mingetty,useradd,passwd,userdel,usermod,groupadd
+	vim /mnt/sysroot/etc/inittab把最后两行改为：
+	1:2345:respawn:/sbin/mingetty tty1
+	2:2345:respawn:/sbin/mingetty tty2
+	保存退出需要下载一个修改过的login文件到/bin目录下 
+	在小系统启动起来后定义PS1
+	cd root
+	vim .bash_profile内容如下
+	PS1='[\u@\h \W]\$'
+	export PS1
+	退出后重新登录后看命令提示符，PS1就是命令提示符\u表示用户名\h主机名\W表示工作目录的基名\w工作目录的全名
+10.单用户模式
+	cd /mnt/sysroot
+	chmod -R og=--- root  #把root目录的权限改为其他用户都无法访问
+	vim root/.bash_profile内容如下：
+	PS1='[\u@\h \W]\$'
+	export PS1
+	编辑vim /etc/inittab内容
+	id:3:initdefault:
+	si::sysinit:/etc/rc.d/rc.sysinit
+	
+	l0:0:wait:/etc/rc.d/rc 0
+	l1:1:wait:/etc/rc.d/rc 1
+	l3:3:wait:/etc/rc.d/rc 3
+	l6:6:wait:/etc/rc.d/rc 6
+	
+	1:2345:respawn:/sbin/mingetty tty1
+	2:2345:respawn:/sbin/mingetty tty2
+	保存退出
+	//关掉服务
+	cd etc/
+	cd rc.d/
+	mkdir rc1.d
+	cd rc1.d
+	ln -sv ../init.d/network K90network
+	ln -sv ../init.d/tserver K33tserver
+	想进入1级别的单用户模式需要借助单用户模式
+	cd ..
+	vim rc.d/init.d/single内容如下
+	#!/bin/bash
+	# chkconfig:
+	# description:
+	case $1 in
+	 start)
+	  ;;
+	 *)
+	  echo "Usage:single start"
+	esac
+	exec /sbin/init S
+	保存退出
+	chmod +x rc.d/init.d/single
+	cd rc.d/rc1.d
+	ln -sv ../init.d/single S98single
+
+接上个制作系统的流程
+cp /etc/issue /mnt/sysroot/etc/
+vim /mnt/sysroot/etc/issue
+内容如下：
+Dubing Linux
+Kernel \r on an \m
+
+Dubing Learning Services
+http://www.f273c.com
+退出
+
+内核有时候要真正装载一个系统有时候也要依赖initrd(ramdisk
+红帽用的是nash
+Ubuntu用的是busybox:
+
+内核编译(busybox+Kernel)：
+busybox:可以把busybox作成一个initrd来用
+	用两个busybox一个用作initrd一个用作根文件系统
+	kernel+initrd(busybox)->rootfs(busybox)
+	若rootfs不够用可以再移植其他的命令
+
+Kernel+ROOTFS()
+
+
+RHEL5.8+busybox(initrd)+rootfs(busybox)
+
+查看本机硬件设备信息：
+1. cat /proc/cpuinfo
+2. lsusb #列出本机的usb信息
+3. lspci可以列出pci总线的设备类型
+4. hal-device
+	Hardware Abstract Layer硬件抽象层
+
+编译内核：
+1.配置
+	make menuconfig(常用)
+	make gconfig(常用)
+	make kconfig(常用)
+	make oldconfig红帽不支持
+	make config
+	以上的为第一步选择一个即可
+	保存为.config
+2.编译
+	make
+	make modules_install
+	make install
+	模块安装位置：/lib/modules/KERNEL_VERSION/
+	
+如何实现部分编译：
+1.只编译某子目录下的相关代码：
+make dir/
+例子：make arch/ 除了模块外的所有核心
+例子：make drivers/ make drivers/net/
+2.只编译部分模块
+make M-drivers/net
+3.只编译某一模块
+make driver/net/pcnet32.ko
+4.将编译完成的结束放置于别的目录中
+make O=/tmp/kernel
+
+如何编译buxybox：
+准备一个IDE格式的磁盘
+/dev/hda1: ext3 /boot
+/dev/hda2: ext3 /
+tar xf busybox-1.23.2.tar.bz2
+cd busybox-1.23.2
+安装与内核一样的编译环境
+yum groupinstall "Development Tools" "Development Libraries"
+make menuconfig
+进入后基本上默认的够用只要改一个
+	Busybox Settings--->Build Options--->Build BusyBox as a static binary这个选中，编译为静态的二进制程序
+	Busybox Settings--->Installation Options--->(./_install) BusyBox installation prefix此选项是装载到busybox当前目录下的_install 可进入修改安装目录
+make install
+	如果报错需要下载一个最新的linux
+	tar xf linux-4.4.tar.gz -C /usr/src
+	cd /usr/src
+	cd linux-4.4
+	cd include/uapi/mtd找到ubi-user.h文件
+	cd
+	cd busybox-1.23.2/include/
+	mkdir mtd
+	cp /usr/src/linux-4.4/include/uapi/mtd/ubi-user.h mtd
+	再次make install
+cp _install/ /tmp/busybox -a
+cd /tmp/busybox
+rm -rf linuxrc 这是一个链接文件
+mkdir proc sys etc dev mnt/sysroot lib/modules -pv
+红帽不支持ext3要手动装卸
+复制模块
+cp /lib/modules/2.6.18-398.el5/kernel/fs/jbd/jbd.ko lib/modules/
+cp /lib/modules/2.6.18-398.el5/kernel/fs/ext3/ext3.ko lib/modules/
+vim init内容如下：
+#!/bin/sh
+insmod /lib/modules/jbd.ko
+insmod /lib/modules/ext3.ko
+
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+
+mdev -s
+
+mount -t ext3 /dev/sda2 /mnt/sysroot
+exec switch_root /mnt/sysroot /sbin/init
+退出给执行权限
+chmod +x init
+mkdir mnt/sysroot -pv
+创建两个设备文件
+mknod dev/console c 5 1
+mknod dev/null c 1 3
+mkdir tmp
+find . | cpio -H newc --quiet -o | gzip -9 > /mnt/boot/initrd.gz
+安装grub与复制vmlinuz
+cd
+cd busybox-1.23.2
+cp _install/* /mnt/sysroot/ -a
+cd /mnt/sysroot/
+rm -rf linuxc
+mkdir proc sys dev tmp var/{log,lock,run} lib/modules etc/rc.d/init.d root boot mnt media -pv
+创建etc/inittab
+vim etc/inittab内容如下：
+::sysinit:/etc/rc.d/rc.sysinit
+console::respawn:-/bin/sh
+::ctrlaltdel:/sbin/reboot
+::shutdown:/bin/umount -a -r
+退出添加执行权限
+chmod +x etc/inittab
+创建vim etc/fstab内容如下
+sysfs                   /sys                    sysfs   defaults        0 0
+proc                    /proc                   proc    defaults        0 0
+/dev/hda1               /boot                   ext3    defaults        0 0
+/dev/hda2               /                       ext3    defaults        1 1
+保存退出给执行权限
+chmod +x etc/fstab
+创建两个设备文件
+mknod dev/console c 5 1
+mknod dev/null c 1 3
+建立系统初始脚本文件
+vim etc/rc.d/rc.sysinit
+内容如下
+#!/bin/sh
+echo -e "\tWeclome to \033[34mDubing \033[0m Linux"
+
+echo -e "Remounting the root filesystem ......[  \033[32mOK\033[0m  ]"
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -o remount,rw /
+
+echo -e "Creating the files of device ........[  \033[32mOK\033[0m  ]"
+mdev -s
+
+echo -e "Mounting the filesystem .............[  \033[32mOK\033[0m  ]"
+mount -a
+swapon -a
+保存退出给执行权限
+chmod +x etc/rc.d/rc.sysinit
+
+
+
+bin etc lib proc sbin sysroot usr
+
+dev init mnt root sys tmp
+
+
+
+脚本编程知识点：
+1、变量中字符的长度：R{#VARNAME}
+2、变量赋值等：
+${parameter:-word}：如果parameter为空或未定义，则变量展开为"word"；否则，展开为parameter的值；
+${parameter:+word}：如果parameter为空或未定义，不做任何操作，否则，则展开为"word"值
+${parameter:=word}：如果parameter为空或未定义，则变量展开为"word"，并将展开后的值赋值给parameter，这种方式不可以独立运行
+${parameter:offset}：相当于str.subString(#num)
+${parameter:offset:length}：取子串，从offset处的后一个字符开始，取leng长的子串；相当于str.subString(#num,#num)
+3、脚本配置文件
+/etc/rc.d/init.d/服务脚本，这些服务脚本支持配置文件在/etc/sysconfig/目录下跟服务脚本同名
+例子：
+vim a.conf内容如下
+TEST="hello world"
+vim a.sh内容如下
+#!/bin/bash
+. ./a.conf
+TEST=${TEST:-info}
+[ -n "$TEST" ] && echo $TEST
+4、局部变量
+local VAR_NAME=
+例子：
+#!/bin/bash
+a=1
+test() {
+ local a=$[3+4]
+}
+test
+for I in `seq $a 10`; do
+ echo $I
+done
+5、命令mktemp
+创建临时文件或目录
+mktemp /tmp/file.XXX：XXX的个数代表着后面随机数的个数，命令返回的是一个路径，可以把路径保存在变量中
+	-d：创建的是一个临时目录
+/tmp：目录每隔30天会清理一次，如果30天之内没有被访问过
+6、信号
+通常发送信息用：kill -SIGNAL PID(1：HUP；2：INT；9：KILL；15：TERM)
+在脚本中，能实现信号捕捉，但9和15无法捕捉
+Ctrl+c：SINGINT
+trap命令：用于捕捉信号
+trap 'COMMAND' 信号列表
+例子：
+#!/bin/bash
+trap 'echo "Your go..."' INT
+while :; do
+ date
+ sleep 2
+done
+7、如果要一次执行两个命令，语句间用分号分隔
+例子：
+#!/bin/bash
+NET=192.168.0
+trap 'echo "quit";exit 1' INT
+for I in {200..254}; do
+ if ping -c 1 -W 1 $NET.$I &> /dev/null; then
+  echo "$NET.$I is up."
+ else
+  echo "$NET.$I is down."
+ fi
+done
+在这个脚本中如果Ctrl+c针对的是ping命令，只是ping命令不执行而不是脚本
+例子：
+#!/bin/bash
+NET=192.168.0
+clearup() {
+ echo "quit..."
+ exit 1
+}
+trap 'clearup' INT
+for I in {200..254}; do
+ if ping -c 1 -W 1 $NET.$I &> /dev/null; then
+  echo "$NET.$I is up."
+ else
+  echo "$NET.$I is down."
+ fi
+done
+
+#!/bin/bash
+NET=192.168.0
+FILE=`mktemp /tmp/file.XXXX`
+clearup() {
+ echo "quit..."
+ rm -rf $FILE
+ exit 1
+}
+trap 'clearup' INT
+for I in {200..254}; do
+ if ping -c 1 -W 1 $NET.$I &> /dev/null; then
+  echo "$NET.$I is up."
+ else
+  echo "$NET.$I is down."
+ fi
+done
+
+
+
+任务计划：
+1、在未来的某个时间点执行一次某任务：
+at：
+at 时间
+at> COMMAND
+at> Ctrl+d
+指定时间：
+	绝对时间：HH:MM, DD.MM.YY,MM/DD/YY   10:21
+	相对时间：now+#  单位：minutes,hours,days,weeks   模糊时间：noo,midnight,teatime     now+3m：三分钟以后
+命令的执行结果：将以邮件的形式发送给安排任务的用户
+参数：
+	-l = atq：查看作业列表，默认队列是a，队列名只可以用单个字符来表示
+	-d #num = atrm：删除一个做业，-d后跟做业号
+bath：自动选择系统较空闲的时候执行作业，其他跟at相同
+
+/etc/at.deny, /etc/at.allow   deny白明单，allow黑明单
+2、周期性地执行某任务
+cron：自身是一个不间断运行的服务，如果关机了则不会进行作业，再开机的话中单的作业将不会再执行，除非到下一个时间点。cron运行在一个很少关机的系统上
+系统cron任务(如清理tmp目录)：系统cron任务都定义在/etc/crontab下
+格式(每个格式之间用空隔隔开)：
+分钟 小时 天 月 周 用户 任务
+
+用户cron任务：用户cron任务都定义在/var/spoll/cron/USERNAME的文件里
+分钟 小时 天 月 周 任务
+
+时间的有效取值
+分钟：0-59
+小时：0-23
+天：1-31
+月：1-12
+周：0-7，0和7都表示周日
+,：离散时间点
+-：连续时间点
+/#：对应聚会范围内每多久一次
+
+时间通配表示：
+*：对应的所有有效取值
+ 例子：
+  3 * * * *：每小时的第三分钟执行一次
+  3 * * * 7：每个星期天的每小时的第三分钟
+  12 12 * * *：每天的12点12分执行一次
+  10,40 * * * *：每小时的10分跟40分执行
+  10,40 02 * * 2,5
+  10 02 * * 1-5：每周一到周五的2点10分执行一次
+  */3 * * * *：每三分钟一次的任务
+  01 */2 * * *：每两小时执行一次
+一般每月的每天跟每周的每天不会同时使用
+
+系统cron跟用户cron定义的格式不一样
+
+cron的执行结果将以邮件形式发给管理员
+*/3 * * * * /bin/cat /etc/fstab > /dev/null：将正常结果发送给/dev/null错误结果以邮件形式发送给管理员
+*/3 * * * * /bin/cat /etc/fstab &> /dev/null：不管结果正确错误都送给/dev/null
+
+cron的环境变量：cron执行所有命令都去PATH环境变量指定的路径下去找
+ PATH /bin:/sbin:/usr/bin:/usr/sbin
+如果想使用脚本自身的环境变量只需在脚本中的第一行如下写：
+#!/bin/bash
+export PATH=
+
+用户任务的管理：
+crontab
+ -l：列出当前用户的所有cron任务
+ -e：编辑cron任务，可检查语法错误
+ -r：移除所有任务
+ -u USERNAME：管理其他用户的cron任务
+删除其他用户的任务则用：crontab -u UAERNAME -r
+
+
+anacron：cron的补充，自身是一个不间断运行的服务，能够实现让cron因为各种原因在过去的时间该执行而未执行的任务在恢复正常执行一次；在服务器上它默认不启动
+anacron只可以补充cron不可以代替cron在/etc/anacrontab，最小的执行单位是天
+格式
+第一段：大于多少天的任务没有执行
+第二段：在开机以后的多少分钟执行
+第三段：注释
+第四段：要执行的任务
+cron必须保证crond服务在运行，anacron只要anacron服务运行
+
+
+
+裁剪系统：
+
+硬件驱动：initrd
+ initrd：仅需要提供内核访问真正的根文件系统所在的设备需要的驱动
+  存储设备和文件系统相关的模块
+ 系统初始化rc.sysinit：初始其他硬件的驱动程序
+ ROOTFS：busybox,init不支持运行级别
+  /etc/inittab：格式也不会相同，如果移植系统自带的inittab则busybox的inittab文件格式必须跟移植的格式一榜首
+
+
+  
+  
+  
+  
+  
+  
+  
+  
+
+  
+  
+Linux上的日志系统
+syslog
+syslog-ng：开源，syslog-ng比syslog强大的多
+  
+日志系统：syslog(由两个进程组成)
+syslog是一个服务：
+两个进程：
+ syslogd：系统，非内核产生的信息
+ klogd：内核，专门负责记录内核产生的日志信息
+ 配置文件：/etc/syslog.conf
+ 
+syslog：syslogd和klogd
+配置文件定义格式为：facility.priority        action
+facility可以理解为日志的来源或设备目前常用的facility有以下几种：
+ auth                    # 认证相关的
+ authpriv                # 权限，授权相关的
+ cron                    # 任务计划相关的
+ daemon                  # 守护进程相关的
+ kern                    # 内核相关的
+ lpr                     # 打印相关的
+ mail                    # 邮件相关的
+ mark                    # 标记相关的
+ news                    # 新闻相关的
+ security                # 安全相关的,与auth类似
+ syslog                  # syslog自己的
+ user                    # 用户相关的
+ uucp                    # unix to unix cp 相关的
+ local0 到 local7        # 用户自定义使用
+ *                       # *表示所有的facility
+ 
+priority(log level)日志级别，一般有以下几种级别(从低到高)级别越低记录的信息越详细
+ debug                  # 程序或系统的调试信息
+ info                   # 一般信息
+ notice                 # 不影响正常功能，需要注意的消息
+ warning/warn           # 可能影响系统功能，需要提醒用户的重要事件
+ err/error              # 错误信息
+ crit                   # 比较严重的
+ alert                  # 必须马上处理的
+ emerg/panic            # 会导致系统不可用的
+ *                      # 表示所有的日志级别
+ none                   # 跟*相反，表示啥也不记录
+
+action(动作)日志记录的位置
+ 系统上一个绝对路径       # 普通文件 如： /var/log/xxx
+ |                        # 管道 通过管道送给其他的命令处理
+ 终端                     # 如：/dev/console
+ @HOST                    # 远程主机 如：10.0.0.1
+ 用户                     # 系统用户 如：root
+ *                        # 登录到系统上的所有用户，一般emerg级别的日志是这样定义的
+ 
+定义格式例子：
+mail.info  /var/log/mail.log  # 表示将mail相关的,级别为info及，如果文件前加一个"-"表示异步写入
+                              # info以上级别的信息记录到/var/log/mail.log文件中
+auto.=info @10.0.0.1          # 表示将auth相关的,基本为info的信息记录到10.0.0.1主机上去
+                              # 前担是10.0.0.1要能接收其他主机发来的日志信息
+user.!=error                  # 表示记录user相关的，不包括error级别的信息
+user.!error                   # 与user.error相反
+*.info                        # 表示记录所有的日志信息的info级别
+mail.*                        # 表示记录mail相关的所有级别的信息
+*.*                           # 你懂的
+cron.info;mail.info           # 多个目录来源可以有";"隔开
+cron,mail.info                # 与cron.info;mail.info是一个意思
+mail.*;mail.!=info            # 表示记录mail相关的所有级别的信息，但不包括info级别的信息
+
+如果想改变系统定义的日志信息只要修改/etc/syslog.conf即可，但不会立即生效，需要重启日志信息：service syslog restart但不建议用，可以service syslog reload这样在reload的时候其他日志也可以写入，restart时其他日志不能写入
+
+busybox也可以提供日志功能：
+需要在etc/rc.d/rc.sysinit里添加两行
+syslogd
+klogd
+然后添加配置文件即可
+
+kernel -->物理终端(/dev/console)-->/var/log/dmesg
+或者用dmesg命令查看或cat /var/log/dmesg
+
+
+日志需要滚动(日志切割)：
+messages messages.2 messages.1
+
+logrotate：帮助完成日志切割
+/etc/cron.daily/logrotate这个计划日志专门来完成日志切割，它的内容如下：
+#!/bin/sh
+
+/usr/sbin/logrotate /etc/logrotate.conf >/dev/null 2>&1
+EXITVALUE=$?
+if [ $EXITVALUE != 0 ]; then
+    /usr/bin/logger -t logrotate "ALERT exited abnormally with [$EXITVALUE]"
+fi
+exit 0
+它是借助/etc/logrotate.conf来完成日志切割参数解释：
+weekly                      # 每周滚动一次
+rotate 4                    # 保存四个版本，超出的都删除
+create                      # 滚动完后创建新文件
+include /etc/logrotate.d/   # 包含这个目录下的所有日志文件
+
+一般日志需要经常性的滚动，以免日志文件越来越大
+/sbin/init
+ /var/log/messages：系统标准错误信息：大多数的子系统所产生的错误信息都会在这里；非内核产生引导信息；各子系统产生的信息
+ /var/log/mailog：邮件系统产生的日志信息
+ /var/log/secure：用户登录日志
+不接授syslog的日志也可以放在/var/log目录下
+
+信息详细程序：日志级别
+
+子系统：facility，设施
+
+动作：
+
+定义日志信息由：日志级别，子系统，动作组成
+
+
+
+
+
+
+SSH：Secure SHell，协议基于22/tcp
+通信过程及认证过程是加密的，主机认证
+用户认证：用户认证的过程加密
+数据传输过程加密
+
+ssh v1, v2
+v1无法避免中间人攻击man-in-middle
+在服务器止一定要用sshv2版本
+
+ssh认证过程：
+基于口令认证：用户输密码
+基于密钥认证：不需要输入密码
+
+协议：规范
+实现：服务器端、客户瑞
+
+Llinux上服务器端:openSSH
+ c/s
+  服务器端：sshd，配置文件/etc/ssh/sshd_config
+  客户端：ssh，配置文件/etc/ssh/ssh_config
+openSSH还提供了以下客户端
+ ssh-keygen：密钥生成器
+ ssh-copy-id：将公钥传输至远程服务器
+ scp：跨主机安全复制工具
+
+ssh命令：
+ssh接受的密钥在当前用户的家目录下有个.ssh目录里有个known_hosts文件记录接爱主机的密钥
+在linux上如果ssh登录时如果没有指定用户名则默认是当前登录用户的用户名，若想指定用户则用以下方式
+ssh USERNAME@HOST
+ssh -l USERNAME HOST
+ssh USERNAME@HOST 'COMMAND'   可以登录上以后执行一个命令立马退出
+
+scp：
+ scp SRC DEST
+  -r
+  -a
+  scp USERNAME@HOST:/path/to/somefile /path/to/local
+  例子：
+  scp hadoop@172.16.200.1:/etc/fstab ./     #把远程主机上的文件复制到本地
+  scp /path/to/local USERNAME@HOTS:/path/to/local
+  例子：
+   scp busybox-1.20.2.tar.bz2 hadoop@172.16.200.1:~    #把文件拷贝到远程主机的家目录下去
+
+ssh-keygen(用于生成密钥)
+ -t rsa(用rsa方式生成密钥
+  ~/.ssh/id_rsa：这个是私钥保存在本地
+  ~/.ssh/id_rsa.pub：这个是公钥，需要放到服务器上去
+公钥追加到远程主机某用户的家目录下的.ssh/authorized_keys文件或.ssh/authorized_keys2文件中，一般用的，.ssh目录的权限必须是700的权限
+
+ssh-copy-id
+ -i ~/.ssh/id_rsa.pub
+ssh-copy-id -i ~/.ssh/id_rsa.pub USERNAME@HOST
+例子：
+ssh-copy-id -i .ssh/id_rsa.pub root@172.16.200.115
+
+dropbear：嵌入式系统专用的ssh服务器端和客户端工具
+服务器端:dropbear
+密钥生成工具：dropbearkey服务器端用的
+客户端：dbclient
+dropbear默认使用nsswitch实现名称解析
+ /etc/nsswitch.conf
+ /lib/libnss_files*
+ /usr/lib/libnss3.so
+ /usr/lib/libnss_files*
+dropbear会在用户登录时检查其默认shell是否为当前系统的安全shell
+ /etc/shells
+
+安装编译dropbear：
+下载解压后进入文件夹
+./configure
+make
+make install
+
+dropbearkey
+ -t rsa|dss
+ -f /path/to/KEY_FILE
+ -s SIZE
+ 
+主机密钥默认位置
+etc/dropbear/   有两种
+ RSA：dropbear_rsa_host_key
+  长度可变，只要是8的整数倍，默认为1024
+ DSS：dropbear_dss_host_key
+  长度固定，默认为1024
+
+移植dropbear：
+先把dropbear里的命令移植过去，可直接使用写的脚本文件
+dropbear,dropbearkey,dbclient
+到目录系统下
+cd /mnt/sysroot/
+编辑文件
+vim etc/shells内容如下
+/bin/sh
+/bin/bash
+/bin/ash
+/bin/hush
+编辑vim etc/fstab文件加上伪文件系统
+devpts   /dev/pts   devpts   mode=620   0 0
+然后建立目录
+mkdir dev/pts
+mkdir etc/dropbear
+dropbearkey -t rsa -f /mnt/sysroot/etc/dropbear/dropbear_rsa_host_key -s 2048
+dropbearkey -t dss -f /mnt/sysroot/etc/dropbear/dropbear_dss_host_key
+复制libnss
+确保有usr/lib目录
+cp -d /lib/libnss_file* /mnt/sysroot/lib/
+cp -d /usr/lib/libnss3.so /usr/lib/libnss_files.so /mnt/sysroot/usr/lib/
+cp /etc/nsswitch.conf /mnt/sysroot/etc/
+编辑vim /mnt/sysroot/etc/nsswitch.conf只需要保留以下四行即可
+passwd:     files
+shadow:     files
+group:      files
+hosts:      files dns
+在小系统里第一次测试可以这样：
+/usr/local/sbin/dropbear -E -F
+让dropbear运行在前台测试，用其他机子联上来试试
+/usr/local/sbin/dropbear   #直接让dropbear运行在后台
+在小系统上测试是否可以连接其他主机
+/usr/local/bin/dbclient -l root 172.16.200.1
+
+mkisofs -R -b isolinux/isolinux.bin -no-emul-boot -boot-load-size 4 -boot-info-table -o boot.iso iso/   ：把目录iso制作成boot.iso文件格式
+
+
+
+
+
+常见的系统故障排除：
+1、确定问题的故障特征
+2、重现故障
+3、使用工具收集进一步信息
+4、排除不可能的原因
+5、定位故障：
+ 从简单的问题入手
+ 一次尝试一种方式
+ 
+1、备份原文件
+2、尽可能借助于工具
+
+可能会出现的故障：
+1、管理员密码忘记
+2、系统无法正常启动
+ a、grub损坏(MBR损坏、 grub配置文件丢失)
+ b、系统初始化故障(某文件系统无法正常挂载，驱动不兼容)
+  grub：编辑模式
+  emergency 手动修复
+ c、服务故障
+ d、用户无法登录系统(mingetty,bash程序故障)
+3、命令无法运行
+	只要不是修改配置文件，退出当前shell再登录一次即可，或另启终端，重新登录
+	如果修改配置文件，执行/bin/ls 找到vim命令编辑/etc/profile即可
+4、编译过程无法继续(开发环境缺少基本组件)
+
+MBR损坏：
+1、借助别的主机修复；
+2、使用紧急救援模式；
+ a、启动boot.iso
+ b、使用完整的系统安装光盘
+ boot:linux rescue  ：进入
+  挂载到/mnt/sysimage目录下，以只读方式挂载，需要写信息时重新挂载为读写,主要同配置grub文件可参才前面
+
+grub配置文件丢失、损坏、语法不正确：
+grub> root (hd0,0)
+grub> kernel /vmlinuz- ro root /dev/vo10/root rhgb quiet
+grub> initrd /initrd-
+grub> boot
+
+kernel panic：内核恐慌
+把默认级别设定为0或6：向内核传参进入1级别单用户模式，编辑inittab文件
+/etc/rc.d/rc3.d目录被删除-->进入单用户模式，修改目录系统
+某个服务故障导致启动停止，如：endmail，配置文件时间戳检查无法通过-->进入交互式模式(在启动时出现Red Hat时不停的敲I键进入交互式模式)
+rc.local脚本语法错误或出现逻辑错误：进入单用户模式修改这个文件
+如果不小心把/bin/bash删除：进入紧急救缓模式，当光盘启动时需要挂载光盘(一般光盘模拟的是hd设备，所以只需要挂载hdc设备即可)然后找到bash-3.2-32.el5.i386.rpm重装：rpm -ivh --replacekgs --root /mnt/sysimage bash-3.2.el5.i386.rpm装到以/mnt/sysimage为根的目录下
+mingetty丢失可以进入单用户模式修复

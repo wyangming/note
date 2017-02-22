@@ -1,0 +1,362 @@
+vim编辑器详解
+
+vim编辑器只编辑纯文本ASCII
+
+VI：Visual Interface
+vim：VI IMproved
+
+全屏编辑器，模式化编辑器
+
+vim模式(在不同的模式下机键动作被解析的意义是各不相同的)：
+	编辑模式(命令模式)：所有的机键动作都会被理解为编辑整个文档，默认处理编辑模式
+	输入模式：大多数的机键动作都被当作输入到文件中的内容保存到文件当中
+	未行模式：可以输入很多除了编辑命令外的很多文件管理命令，在屏幕的最后一行上输入一些编辑命令是未行模式，还有很多文件管理命令。必须从编辑模式进
+		输入10d可以删除第10行
+		删除10到20行10,20
+		让文件显示行号set nu
+		! ：用!空格后加其他命令可以执行shell命令
+			! ls /etc 查看/etc下的文件
+	
+	三种模式之间可以转换：
+		编辑-->输入：
+			i：在当前光标所在字符前面，转为输入模式
+			a：在当前光标所在字符后面，转为输入模式
+			o：在当前光标所在持的下方，新建一行转为输入模式
+			I：在当前光标所在行的行首，转为输入模式
+			A：在当前光标所在行的行尾，转为输入模式
+			O：在当前光标所在行的上方新建一行转为输入模式
+		输入-->编辑
+			ESC
+		编辑-->未行
+			:
+		未行-->编辑
+			ESC, ESC
+	输入模式与未行模式不可以直接转换
+
+打开文件
+	vim /path/to/somefile 打开或新那一个文件
+
+	vim +# /path/to/somefile 打开文件设置光标在第n行，#表示行数
+	vim + /path/to/somefile 打开文件，定位至最后一行
+	vim +/PATTERN 打开文件定位至第一次被模式匹配到的行上
+	
+	默认处于编辑模式
+
+关闭文件
+	一般在编辑模式与未行模式下完成
+	
+	未行模式
+		q：不保存退出，如果编辑过后用此命令是不让退出的
+		wq：保存退出
+		q!：不保存，强行退出
+		w：保存
+		w!：强行保存只有root才可以用
+	编辑模式
+		ZZ:保存退出
+
+移动光标(编辑模式下)
+	逐字符移动光标
+		h：左
+		l：右
+		j：下
+		k：上
+		
+		#h：向左移动指定数字个字符
+	以单词为单位移动
+		w：移到下一个单词的词首
+		e：移到当前单词的词尾或下一个单词的词尾
+		b：移到当前或前一个单词的词首
+		
+		#w：移动到指定个单词的词首
+	行内跳转
+		0：跳到行首，绝对行首
+		^：跳到行首，行首的第一个非空白字符
+		$：跳到行尾，绝对行尾
+	行间跳转
+		#G：直接跳转至指定行上
+		G：跳转至最后一行
+		
+		在未行模式下也可以跳转，输入数字回车直接跳到相应的行
+
+翻屏(编辑模式下)
+	Ctrl+f：向下翻一屏
+	Ctrl+b：向上翻一屏
+	
+	Ctrl+d：向下翻半屏
+	Ctrl+u：向上翻半屏
+
+删除单个命令(编辑模式下)
+	x：删除光标所在处向后的一个字符
+	#x：删除光标所在后的#个字符
+
+删除命令：d(编辑模式下)
+	可以跟以上的命令结合使用
+	d$：删除从光标所在处至行尾
+	d0：删除从行首至光标所在处
+	dw：从光标所在处向后删除一个单词
+	#dw：从光标所在处向后删除指定数个单词
+	#de：
+	#db：
+	dd：删除光标所在行
+	#dd：删除包括光标所有行在内的#行
+	
+	未行模式删除：
+			.：当前行
+			$：最后一行
+			+#：向下几行
+			$-#：最后几行
+		StartADD,EndADDd：删除从StartADD到EndADD行，最后一个d是删除命令
+		.,+#d：删除从当前行开始到向下的N行，包括当前行。其中.表示当前行
+		.,#d：删除从当前行到第n行
+
+vim最近删除的内容不会立即被清空，保存到缓冲区内。还可以撤回去。最近一次删除的内容还可以粘贴回去。
+
+粘贴命令(编辑模式下)
+	p：如果删除或复制的为整行内容则粘贴至光标所在行下方，如果复制或删除的内容为非整行，则粘贴至光标所在的后面；
+	P：如果删除或复制的为整行内容则粘贴至光标所在行上方，如果复制或删除的内容为非整行，则粘贴至光标所在的前面；
+
+复制命令 y(编辑模式下)
+	用法同d命令
+
+修改：先删除内容，再转换为输入模式 c(编辑模式下)
+	用法同d命令
+
+替换(编辑模式下)
+	r：
+		只适合替换单个字符
+	R：
+		直接进入替换模式，ESC键退出
+
+撤消编辑操作(编辑模式下)
+	u：撤消前一次的操作
+		连续u可撤消此前的n次操作，最多只可以撤消50
+	#u：撤消前几次的操作
+
+撤消最近一次的撤消操作：Ctrl+r(编辑模式下)
+
+重复前一次编辑操作(编辑模式下)：.
+
+可视化模式：可以选中光标划过的所有地方(编辑模式下)
+	v：选中光标划过的所有字符，然后敲d键可以删除所选取的所有字符，也可以作复制与粘贴
+	V：按块先取，只要是光标所在的划过的行都会先中，然后敲d键可以删除所选取的所有字符，也可以作复制与粘贴
+
+查找(末行模式)
+	/PATTERN：文件首部向尾部查找
+	?PATTERN：文件尾部向文件首部查找
+	n：下一个
+	N：上一个
+
+查找替换(在未行模式下)
+	s：跟sed命令一模一样
+	ADDR1,ADDR2S@PATTERN@string@gi
+		例子：
+			.,$ s/he/HE/g 把当前行到最后所有的he替换为HE
+			1,$ s/he/HE/g 所有的he替换为HE
+	明确实现全文查找并替换用%代替即可
+
+vim支持跨文件复制粘贴
+
+使用vim编辑多个文件
+
+	 vim FILE1 FILE2 FILE3...
+	 操作全部在尾行模式下
+		next：切换至下一个文件
+		prev：切换至前一个文件
+		last：切换至最后一个文件
+		first：切换至第一个文件
+	退出
+		qa：全部退出
+
+分屏显示文件(末行模式)
+	Ctrl+w, s：按下Ctrl+w后松开然后按s进行水平拆分窗口
+		Ctrl+w, 方向键转换窗口
+	Ctrl+w, v：按下Ctrl+w后松开然后按v进行垂直拆分窗口
+		Ctrl+w, 方向键转换窗口
+	在窗口间切换光标：
+		Ctrl+w, ARROW
+
+多个文件分窗口
+	vim -o FILE1 FILE2  横向显示多个文件
+	vim -O FILE1 FILE2  垂直显示多个文件
+
+将当前文件中的部分内容另存为另外一个文件(末行模式)
+	末行模式下使用w命令
+	w：保存到当前文件
+	w /path：另存为文件
+	ADDR1, ADDR2w /path：将某些内容保存到另一个文件中去
+
+另外一个文件的内容填充在当前文件中(末行模式)
+	r /path/to/somefile：在当前文件光标所在行的下方填充指定文件的内容,用法跟w命令一样
+
+末行模式下跟shell交互
+! COMMAND
+
+高级话题
+	显示或取消显示行号
+		set number 也可以简写为 set nu
+			取消显示set nonu
+	显示忽略或区分字符大小写
+		set ignorecase
+		set ic
+		不忽略
+		set noignorecase
+		set no ic
+	设置自动缩进
+		set autoindent
+			或 set ai
+		取消
+		set noai
+	查找到的文本高亮显示
+		set hlsearch
+		取消
+		set nohlsearch
+	语法着色
+		syntax on
+		syntax off
+
+vim配置文件
+/etc/vimrc vim的全局配置文件，对所有用户都生效
+~/.vimrc 对于登录用户配置设置
+
+vimtutor 对vim使用的帮助
+
+在用vim的时候断网再次编辑文件的时候会提示是上次意外退出的情况，如果不需要则可以手动把与编辑文件同名加.swap的文件删除即可(必须保证上次编辑的内容没有用可可以)。
+
+例子：
+添加10个用户user1到user10,密码同用户名：但要求只有用户不存在的情况下才能添加
+#!/bin/bash
+for I in {1..10}; do
+  if id user$I &>/dev/null; then
+    echo "user$I exits."
+  else
+    useradd user$I
+    echo user$I | passwd --stdin user$I &> /dev/null
+    echo "Add user user$I finished"
+  fi
+done
+删除10个用户user1到user10,要求只有用户存在的情况下才可以删除
+#!/bin/bash
+for I in {1..10}; do
+  if id user$I &>/dev/null; then
+    userdel -r user$I
+    echo "Delete user$I finished"
+  else
+    echo "user$I not exits."
+  fi
+done
+给脚本一个参数如果是add添加user1到user10，且只有用户不存在的情况下添加。如果是del删除从user1到user10只有存在的情况下删除
+#!/bin/bash
+if [ $# -lt 1 ]; then
+  echo "Usage: adminusers ARG"
+  exit 7
+fi
+if [ $1 == 'add' ];then
+  for I in {1..10};do
+    if id user$I &> /dev/null; then
+      echo "user$I exists."
+    else
+      useradd user$I
+      echo user$I | passwd --stdin user$I &> /dev/null
+      echo "Add user$I finished."
+    fi
+  done
+elif [ $1 == 'del' ]; then
+  for I in {1..10};do
+    if id user$I &> /dev/null; then
+      userdel -r user$I
+      echo "Delete user$I finished."
+    else
+      echo "No user$I"
+    fi
+  done
+else
+  echo "Unknown ARG"
+  exit 8
+fi
+给脚本一个字符串添加用户，多个用户用,分隔，要求在用户不存在的情况下添加
+#!/bin/bash
+echo $1
+for I in `echo $1 | sed 's/,/ /g'`; do
+ if id $I &> /dev/null; then
+  echo "$I exists."
+ else
+  useradd $I
+  echo $I | passwd --stdin $I &> /dev/null
+  echo "add $I finished."
+ fi
+done
+给脚本两个参数，当第一个是add以逗号分隔添加第二个参数后的用户。当第一个为del时删除第二个参数后的参数
+#!/bin/bash
+if [ $1 == '--add' ]; then
+  for I in `echo $2 | sed 's/,/ /g'`; do
+   if id $I &> /dev/null; then
+    echo "$I exists."
+   else
+    useradd $I
+    echo $I | passwd --stdin $I &> /dev/null
+    echo "add $I finished."
+   fi
+  done
+elif [ $1 == '--del' ]; then
+ for I in `echo $2 | sed 's/,/ /g'`;do
+  if id $I &> /dev/null;then
+   userdel -r $I
+   echo "Delete $I finished."
+  else
+   echo "$I NOT exist"
+  fi
+ done
+elif [ $1 == '--help' ]; then
+ echo "Usage: adminuser.sh --add USER1,USER2,... | --del USER1,USER2,... | --help"
+else
+ echo "Unknown options"
+fi
+
+组合条件测试
+	-a：与关系
+	-o：或关系
+	!：非关系
+	
+if [ $# gt 1 -a $# -le 3 ]
+if [ 4# -gt 1 ] && [ $# -le 3 ]
+
+例子：
+写一个脚本如果参数是q,Q,quit,Quit四个参数中的一个打印Quting...并正常退出，否则参数无效，并不正常退出
+#!/bin/bash
+if [ $1 == 'q' -o $1 == 'Q' -o $1 == 'quit' -o $1 == 'Quit' ]; then
+ echo "Quiting..."
+ exit 0
+else
+ echo "Unknown Argument"
+ exit 1
+fi
+
+计算说明
+let SUM+=$I
+
+let I++跟let I+=1
+
+也有++I跟--I
+
+同理：
+-=
++=
+/=
+%=
+
+例子：
+写一个脚本计算100以内所有奇数的和以及所有偶数的和，分别显示
+#!/bin/bash
+declare -i EVENSUM=0
+declare -i ODDSUM=0
+for I in {1..100};do
+ if [ $[$I%2] -eq 0 ]; then
+  let EVENSUM+=$I
+ else
+  let ODDSUM+=$I
+ fi
+done
+echo "Odd sum is : $ODDSUM."
+echo "Even sum is : $EVENSUM."
+
+

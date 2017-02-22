@@ -1,0 +1,84 @@
+HTTP: HyperText Transfer Protocol:超文本传输协议
+
+web:
+http/0.9:仅纯文本(超链接),ASCII,
+   HTML:HyperText Mark Language
+
+浏览器(Browser):
+
+URI(统一资源标识符)：Uniform Resource Indentifier, 定议全局范围内引用某一个独立资源的方式
+   统一：路径格式上的统一
+
+URL(统一资源定位符，是URI的子对象):Uniform Resource Locaor
+
+protocal://HOST:port/path/to/file
+
+web资源：多个资源可能被整合为一个html文档
+
+MIME：Multipurpose Internet Mail Extension，多用途互联网邮件扩展
+  可以将非文本数据在传输前重新编码为文本格式，接收方能够用相反的方式重新还为原来的格式，还能够调用相应的程序来打开此文件。
+
+动态网页：服务器端存储的文档非HTML格式，而是编程语言开发的脚本，脚本接受参数之后在服务器运行一次，运行完成之后会生成HTML格式的文档，把生成的文档发给客户端；
+
+web-->procotol-->php(运行index.php)-->web
+
+动态网页：包含静态内容和动态内容，动态内容部分才需运行
+
+HTTP报文：请求报文，响应报文两种
+
+请求报文语法：
+<method> <request-URL> <version>
+<headers>
+
+<entity-body>
+
+响应报文语法：
+<version> <status> <reason-phrase>
+<headers>
+
+<entity-body>
+
+状态代码：
+1xx：纯信息
+2xx：成功类的状态码(200)
+3xx：重定向类的信息(301, 302, 304)
+4xx：客户端错误类的信息(404)
+5xx：服务器端错误的信息
+
+web服务器的主要操作
+1、建立连接--接受或拒绝客户端的连接请求；
+2、接收请求--通过网络读取HTTP请求报文；
+3、处理请求--解析请求报文并做出相应的动作；
+4、访问资源--访问请求报文中相关的资源；
+5、构建响应--使用正确的首部生成HTTP响应报文；
+6、发送响应--向客户端发送生成的响应报文；
+7、记录日志--当已经完成的HTTP事务记录进日志文件；
+
+httpd的模式：MPM
+  prefork
+  work
+  event
+
+Client(客户端浏览器)：
+ IE
+ Firefox
+ Chrome
+ Opera
+ Safari
+服务器端：
+ Apache->httpd
+ IIS
+ nginx
+ lighttpd
+ thttpd
+
+应用程序服务器：
+ IIS
+ tomcat(apache,jsp open source)
+ Websphere(IBM,jsp comdity)
+ Weblogic(Bea Oracle, jsp commodity)
+ JBoss(RedHat)
+ 
+www.netcraft.com：统计web服务器的市场份额
+
+Web服务器处理并发连接请求的架构方式
