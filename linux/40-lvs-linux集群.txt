@@ -18,4 +18,81 @@ STONITH：Shoot The Other Node In The Head
 
 集群的节点最少要有3个或者奇数个。
 
-36-02
+LVS
+ipvsadm：管理集群服务的命令行工具，工作在用户空间
+ipvs：工作在内核。2.4.23之前的服务器上需要向内核打补丁编译安装ipvs，2.6.2以后是内置ipvs
+
+lvs是工作在input链上的，不能与iptables一起使用
+
+LVS三种类型：
+NAT(Network address translation)：地址转换，一般情况下顶多负载10个，性能也不是很好。1、集群节点跟director必须在同一个IP网络中；2、RIP通常是私有地址，仅用于各集群节点的通信；3、director位于client和real server之间，并负责处理进出的所有通信；4、realserver必须将网关指向DIP；5、支持端口映射；6、realserver可以使用任意OS；7、较大规模应用场景中，director易成为系统瓶颈。
+DR(Direct routing)：直接路由。1、各集群节点跟director必须在同一个物理网络中；2、RIP可以不用是私有地址，实现便捷的远程管理和监控；3、director仅负责入站请求，响应报文则由realserver直接发往客户端；4、realserver不能将网关指向DIP；5、director不支持端口映射；6、大多数操作系统都可以处理DR；7、比NAT可以处理多很多的节点；
+TUN(IP tunneling)：隧道。工作机制跟DR一样，在转发时需要重新封装报文。1、各集群节点可以跨越Internet；2、RIP必须是公网地址或是可路由地址；3、director仅处理入站请求，响应报文则由realserver直接发往客户端；4、realserver网关不能指向director；5、只有支持隧道功能的os才能用于realserver；6、不支持端口映射；
+
+lvs固定调度：
+rr：轮叫，轮询
+wrr：Weight，加权
+sh：source hash，源地址hash，来自同一个客户端的请求，在同一个时间范围内请求发送到同一个realserver
+dh：
+
+lvs动态调度：
+lc(Least Connection)：最少连接  active*256+inactive(非活动连接数)  那个小用那个
+wlc(Weight Least Connection)：Weight 加权最少连接  (active*256+inactive)/weight 那个小用那个
+sed：最短期望延迟  (active+1)*256/weight
+nq：never queue
+lblc(Locality Based Least Connection)：基于本地的最少连接
+lblcr：基于本地的带复制功能的最少连接
+
+lvs默认调度方法是wlc
+
+安装ipvsadm:yum install ipvsadm
+
+ipvsadm:
+ 管理集群服务
+  添加：-A -t|u|f service_address [-s scheduler]
+   -t：TCP协议的集群
+    service_address：IP:PORT
+   -u：UDP协议的集群
+    service_address：IP:PORT
+   -f：FWM(防火墙标记)
+    service_address：Mark Number
+   -s：使用的调度方法
+  修改：-E  跟添加使用方法一样
+  删除：-D -t|u|f service_address
+
+  # ipvsadm -A -t 172.16.100.1:80 -s rr  //把tcp的80端口作为集群
+ 管理集群服务中的RS
+  添加：-a -t|u|f service_address -r server-address [-g|i|m] [-w weight] [-x upper] [-y lower]
+   service-address：事先定义好的某集群服务
+   -r server-address：某RS的地址，在NAT模型中，可使用IP:PORT做端口映射
+   [-g|i|m]：LVS类型
+    -g：DR这个是默认
+    -i：TUN
+    -m：NAT
+   [-w weight]：定义支持的权重
+  修改：-e跟添加一样
+  删除：-d -t|u|f service-address -r server-address
+
+  # ipvsadm -a -t 172.16.100.1:80 -r 192.168.10.8 -m
+  # ipvsadm -a -t 172.16.100.1:80 -r 192.168.10.0 -m  //把两个加入到集群中
+ 查看
+  [-L|l]
+   -n：数字格式，显示IP地址和端口
+   --stats：统计信息
+   --rate：输出速率信息
+   --timeout：输出tcp、tcpfin、udp的会话超时时间长度
+   --daemon：可以显示进程状态及多播端口
+   --sort：对-l列出来的集群服务进行排序，默认是升序；
+   -c：显示当前lvs的连接状况，有多少客户端连接进来
+ 删除所有集群服务
+  -C：清空所有ipvs规则
+ 保存规则
+  -S
+   # ipvsadm -S > /path/to/somefile
+ 载入此前的规则
+  -R
+   * ipvsadm -R < /path/to/somefile
+
+
+
+36-03 88
