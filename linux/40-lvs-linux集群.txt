@@ -1,3 +1,5 @@
+(没有亲自试过)
+
 当服务器资源不够用时通常有以下几种方式：
 Scale On：向上扩展(相当于把原有的服务器进行升级)  一般来说硬件的扩展不是线性增长的。可能在一定的情况下是线性增长的。cpu核数越多它们之间产生的资源竞争也会产生更多的资源。
 Scale Out：向外扩展(相当于原来一个服务器，横向变为两个)  这个就是负载均衡。
@@ -93,6 +95,75 @@ ipvsadm:
   -R
    * ipvsadm -R < /path/to/somefile
 
+在做集群服务时，各节点时间偏差不应该超出1秒钟；可以使用ntp服务器进行时间同步。
+
+#NAT模式lvs的配置
+ipvsadm -A -t 172.16.100.1:80 -s rr
+ipvsadm -a -t 172.16.100.1:80 -r 192.168.10.8 -m
+ipvsadm -a -t 172.16.100.1:80 -r 192.168.10.9 -m
+service ipvsadm save  #把写的规则保存到配置文件里，配置文件在/etc/sysconfig/ipvsadm
+ipvsadm -S > /etc/sysconfig/ipvsadm.web  #把规则保存到别一个文件里
+ipvsadm -R < /etc/sysconfig/ipvsadm.web  #把规则加载到ipvsadm里
+cat /proc/sys/net/ipv4/ip_forward  #查看网卡间的转发是否打开
+echo 1 > /proc/sys/net/ipv4/ip_forward  #打开网卡间的转发
+#这些在director服务器上就可以完成，要关闭selinux，不能跟iptables一块使用。director需要有两个网卡也就是两个ip
+
+kernel parameter:
+arp_ignore：定义接收arp请求时响应级别；
+ 0：只要本机上配置有地址就响应，默认值
+ 1：仅在目标ip是本地地址，且匹配在请求进来的接口上时进行的响应，lvs使用这个即可
+ 2：
+ 3:
+ 4-7：
+ 8：
+arp_announce：定义将自己地址向外通告级别
+ 0：将本机任何接口上的任何地址向外能行，默认值
+ 1：试图向目标网络通告与其网络匹配的地址
+ 2：仅向与本地接口上地址匹配的网络进行通告，lvs使用这个
+
+Director:
+eth0, DIP:172.16.100.2
+eth0:0, VIP:172.16.100.1
+RS1:
+eth0, rip:172.16.100.7
+lo:0, rip:172.16.100.1
+RS2:
+eth0, rip:172.16.100.8
+lo:0, rip:172.16.100.1
+集群的网络地址必须在同一个物理网络中
+
+在Director上配置：
+setup  #用来配置网络地址，网关是172.16.0.2
+ifconfig eth0:0 172.16.100.1/16  #配置vip地址
+#在RS服务器上要先配置rip然后关掉arp_ignore与arp_announce后再配置vip地址
+#两个rs服务器配置好rip后关闭arp_ignore与arp_announce
+#内核参数目录在/proc/sys/net/ipv4/conf下有all eth0 lo目录lo与eth0只配置一个即可all必须配置
+#RS1上面的配置
+sysctl -w net.ipv4.conf.eth0.arp_announce=2 #或者echo 2 > net.ipv4.conf.eth0.arp_announce
+sysctl -w net.ipv4.conf.all.arp_announce=2 #或者echo 2 > net.ipv4.conf.all.arp_announce
+sysctl -w net.ipv4.conf.eth0.arp_ignore=1 #或者echo 1 > net.ipv4.conf.eth0.arp_ignore
+sysctl -w net.ipv4.conf.all.arp_ignore=1 #或者echo 1 > net.ipv4.conf.all.arp_ignore
+ifconfig lo:0 172.16.100.1 broadcast 172.16.100.1 netmask 255.255.255.255 up #vip地址的配置
+route add -host 172.16.100.1 dev lo:0  #添加路由如果是从172.16.100.1进来的交给lo:0处理
+#RS2跟上面的配置方法一样
+#在Director上配置lvs
+ipvsadm -A -t 172.16.100.1:80 -s wlc
+ipvsadm -a -t 172.16.100.1:80 -r 172.16.100.7 -g -w 2
+ipvsadm -a -t 172.16.100.1:80 -r 172.16.100.8 -g -w 1
 
 
-36-03 88
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+37-02
